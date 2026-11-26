@@ -18,8 +18,35 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     required super.portManager,
   });
 
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_FfiSessionHandlePtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandlePtr;
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw);
+
+  @protected
+  FfiSessionHandle
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    dynamic raw,
+  );
+
+  @protected
+  FfiSessionHandle
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    dynamic raw,
+  );
+
+  @protected
+  FfiSessionHandle
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<FfiSessionEvent> dco_decode_StreamSink_ffi_session_event_Sse(
+    dynamic raw,
+  );
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -28,10 +55,91 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  FfiCertInfo dco_decode_box_autoadd_ffi_cert_info(dynamic raw);
+
+  @protected
+  FfiConnectConfig dco_decode_box_autoadd_ffi_connect_config(dynamic raw);
+
+  @protected
+  FfiCredentials dco_decode_box_autoadd_ffi_credentials(dynamic raw);
+
+  @protected
+  FfiFramePatch dco_decode_box_autoadd_ffi_frame_patch(dynamic raw);
+
+  @protected
+  FfiSessionState dco_decode_box_autoadd_ffi_session_state(dynamic raw);
+
+  @protected
+  double dco_decode_f_32(dynamic raw);
+
+  @protected
+  FfiAudioMode dco_decode_ffi_audio_mode(dynamic raw);
+
+  @protected
+  FfiAudioReadResult dco_decode_ffi_audio_read_result(dynamic raw);
+
+  @protected
+  FfiCertInfo dco_decode_ffi_cert_info(dynamic raw);
+
+  @protected
+  FfiCertTrustDecision dco_decode_ffi_cert_trust_decision(dynamic raw);
+
+  @protected
+  FfiConnectConfig dco_decode_ffi_connect_config(dynamic raw);
+
+  @protected
+  FfiCredentials dco_decode_ffi_credentials(dynamic raw);
+
+  @protected
+  FfiFramePatch dco_decode_ffi_frame_patch(dynamic raw);
+
+  @protected
+  FfiSecurityMode dco_decode_ffi_security_mode(dynamic raw);
+
+  @protected
+  FfiSessionEvent dco_decode_ffi_session_event(dynamic raw);
+
+  @protected
+  FfiSessionEventKind dco_decode_ffi_session_event_kind(dynamic raw);
+
+  @protected
+  FfiSessionState dco_decode_ffi_session_state(dynamic raw);
+
+  @protected
+  FfiSessionStateKind dco_decode_ffi_session_state_kind(dynamic raw);
+
+  @protected
+  int dco_decode_i_16(dynamic raw);
+
+  @protected
+  int dco_decode_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  FfiCertInfo? dco_decode_opt_box_autoadd_ffi_cert_info(dynamic raw);
+
+  @protected
+  FfiCredentials? dco_decode_opt_box_autoadd_ffi_credentials(dynamic raw);
+
+  @protected
+  FfiFramePatch? dco_decode_opt_box_autoadd_ffi_frame_patch(dynamic raw);
+
+  @protected
+  FfiSessionState? dco_decode_opt_box_autoadd_ffi_session_state(dynamic raw);
 
   @protected
   RdpEngineSummary dco_decode_rdp_engine_summary(dynamic raw);
@@ -40,13 +148,45 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_u_16(dynamic raw);
 
   @protected
+  int dco_decode_u_32(dynamic raw);
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw);
+
+  @protected
   int dco_decode_u_8(dynamic raw);
 
   @protected
   void dco_decode_unit(dynamic raw);
 
   @protected
+  BigInt dco_decode_usize(dynamic raw);
+
+  @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
+
+  @protected
+  FfiSessionHandle
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiSessionHandle
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiSessionHandle
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<FfiSessionEvent> sse_decode_StreamSink_ffi_session_event_Sse(
+    SseDeserializer deserializer,
+  );
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -55,10 +195,117 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  FfiCertInfo sse_decode_box_autoadd_ffi_cert_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiConnectConfig sse_decode_box_autoadd_ffi_connect_config(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiCredentials sse_decode_box_autoadd_ffi_credentials(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiFramePatch sse_decode_box_autoadd_ffi_frame_patch(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiSessionState sse_decode_box_autoadd_ffi_session_state(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  double sse_decode_f_32(SseDeserializer deserializer);
+
+  @protected
+  FfiAudioMode sse_decode_ffi_audio_mode(SseDeserializer deserializer);
+
+  @protected
+  FfiAudioReadResult sse_decode_ffi_audio_read_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiCertInfo sse_decode_ffi_cert_info(SseDeserializer deserializer);
+
+  @protected
+  FfiCertTrustDecision sse_decode_ffi_cert_trust_decision(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiConnectConfig sse_decode_ffi_connect_config(SseDeserializer deserializer);
+
+  @protected
+  FfiCredentials sse_decode_ffi_credentials(SseDeserializer deserializer);
+
+  @protected
+  FfiFramePatch sse_decode_ffi_frame_patch(SseDeserializer deserializer);
+
+  @protected
+  FfiSecurityMode sse_decode_ffi_security_mode(SseDeserializer deserializer);
+
+  @protected
+  FfiSessionEvent sse_decode_ffi_session_event(SseDeserializer deserializer);
+
+  @protected
+  FfiSessionEventKind sse_decode_ffi_session_event_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiSessionState sse_decode_ffi_session_state(SseDeserializer deserializer);
+
+  @protected
+  FfiSessionStateKind sse_decode_ffi_session_state_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int sse_decode_i_16(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  FfiCertInfo? sse_decode_opt_box_autoadd_ffi_cert_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiCredentials? sse_decode_opt_box_autoadd_ffi_credentials(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiFramePatch? sse_decode_opt_box_autoadd_ffi_frame_patch(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FfiSessionState? sse_decode_opt_box_autoadd_ffi_session_state(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RdpEngineSummary sse_decode_rdp_engine_summary(SseDeserializer deserializer);
@@ -67,17 +314,50 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_u_16(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer);
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
+  BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    FfiSessionHandle self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    FfiSessionHandle self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    FfiSessionHandle self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_ffi_session_event_Sse(
+    RustStreamSink<FfiSessionEvent> self,
     SseSerializer serializer,
   );
 
@@ -88,11 +368,146 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_ffi_cert_info(
+    FfiCertInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ffi_connect_config(
+    FfiConnectConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ffi_credentials(
+    FfiCredentials self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ffi_frame_patch(
+    FfiFramePatch self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_ffi_session_state(
+    FfiSessionState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_f_32(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ffi_audio_mode(FfiAudioMode self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ffi_audio_read_result(
+    FfiAudioReadResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_cert_info(FfiCertInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ffi_cert_trust_decision(
+    FfiCertTrustDecision self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_connect_config(
+    FfiConnectConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_credentials(
+    FfiCredentials self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_frame_patch(FfiFramePatch self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ffi_security_mode(
+    FfiSecurityMode self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_session_event(
+    FfiSessionEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_session_event_kind(
+    FfiSessionEventKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_session_state(
+    FfiSessionState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_session_state_kind(
+    FfiSessionStateKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_i_16(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_cert_info(
+    FfiCertInfo? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_credentials(
+    FfiCredentials? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_frame_patch(
+    FfiFramePatch? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_session_state(
+    FfiSessionState? self,
     SseSerializer serializer,
   );
 
@@ -106,13 +521,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
 
   @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
+  void sse_encode_usize(BigInt self, SseSerializer serializer);
 }
 
 // Section: wire_class
@@ -128,4 +549,38 @@ class RustLibWire implements BaseWire {
   /// The symbols are looked up in [dynamicLibrary].
   RustLibWire(ffi.DynamicLibrary dynamicLibrary)
     : _lookup = dynamicLibrary.lookup;
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandlePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_aer_rdp_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandlePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandlePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_aer_rdp_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandlePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 }

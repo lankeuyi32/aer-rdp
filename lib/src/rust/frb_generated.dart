@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1027837964;
+  int get rustContentHash => 96506394;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -76,6 +76,79 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
+  FfiCertInfo? crateApiFfiSessionHandleCertInfo({
+    required FfiSessionHandle that,
+  });
+
+  void crateApiFfiSessionHandleDisconnect({required FfiSessionHandle that});
+
+  String crateApiFfiSessionHandleFramebufferSha256Hex({
+    required FfiSessionHandle that,
+  });
+
+  FfiAudioReadResult crateApiFfiSessionHandleReadAudioPcm({
+    required FfiSessionHandle that,
+    required int requestedFrames,
+    required int framesPlayedSinceLastRead,
+  });
+
+  void crateApiFfiSessionHandleSendPointerEvent({
+    required FfiSessionHandle that,
+    required int x,
+    required int y,
+    required int buttonMask,
+    required bool down,
+    required int wheelDeltaV,
+    required int wheelDeltaH,
+  });
+
+  void crateApiFfiSessionHandleSendScancode({
+    required FfiSessionHandle that,
+    required int code,
+    required bool extended,
+    required bool down,
+  });
+
+  void crateApiFfiSessionHandleSendUnicode({
+    required FfiSessionHandle that,
+    required int codeUnit,
+    required bool down,
+  });
+
+  void crateApiFfiSessionHandleSetAudioMute({
+    required FfiSessionHandle that,
+    required bool muted,
+  });
+
+  void crateApiFfiSessionHandleSetAudioVolume({
+    required FfiSessionHandle that,
+    required double volume,
+  });
+
+  void crateApiFfiSessionHandleSubmitCertDecision({
+    required FfiSessionHandle that,
+    required FfiCertTrustDecision decision,
+  });
+
+  void crateApiFfiSessionHandleSubmitCredentials({
+    required FfiSessionHandle that,
+    required FfiCredentials creds,
+  });
+
+  Stream<FfiSessionEvent> crateApiFfiSessionHandleSubscribeEvents({
+    required FfiSessionHandle that,
+  });
+
+  Future<FfiFramePatch?> crateApiFfiSessionHandleTakeFramePatch({
+    required FfiSessionHandle that,
+    required bool forceFull,
+  });
+
+  FfiSessionHandle crateApiCreateSession({
+    required FfiConnectConfig config,
+    FfiCredentials? initialCreds,
+  });
+
   String crateApiFingerprintSha256Hex({required List<int> derBytes});
 
   RdpEngineSummary crateApiGetEngineSummary();
@@ -86,6 +159,15 @@ abstract class RustLibApi extends BaseApi {
     required int width,
     required int height,
   });
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_FfiSessionHandle;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_FfiSessionHandle;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_FfiSessionHandlePtr;
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -97,13 +179,503 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
+  FfiCertInfo? crateApiFfiSessionHandleCertInfo({
+    required FfiSessionHandle that,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_ffi_cert_info,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiFfiSessionHandleCertInfoConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleCertInfoConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_cert_info",
+        argNames: ["that"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleDisconnect({required FfiSessionHandle that}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleDisconnectConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleDisconnectConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_disconnect",
+        argNames: ["that"],
+      );
+
+  @override
+  String crateApiFfiSessionHandleFramebufferSha256Hex({
+    required FfiSessionHandle that,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiFfiSessionHandleFramebufferSha256HexConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleFramebufferSha256HexConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_framebuffer_sha256_hex",
+        argNames: ["that"],
+      );
+
+  @override
+  FfiAudioReadResult crateApiFfiSessionHandleReadAudioPcm({
+    required FfiSessionHandle that,
+    required int requestedFrames,
+    required int framesPlayedSinceLastRead,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_u_32(requestedFrames, serializer);
+          sse_encode_u_32(framesPlayedSinceLastRead, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ffi_audio_read_result,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiFfiSessionHandleReadAudioPcmConstMeta,
+        argValues: [that, requestedFrames, framesPlayedSinceLastRead],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleReadAudioPcmConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_read_audio_pcm",
+        argNames: ["that", "requestedFrames", "framesPlayedSinceLastRead"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSendPointerEvent({
+    required FfiSessionHandle that,
+    required int x,
+    required int y,
+    required int buttonMask,
+    required bool down,
+    required int wheelDeltaV,
+    required int wheelDeltaH,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_u_16(x, serializer);
+          sse_encode_u_16(y, serializer);
+          sse_encode_u_8(buttonMask, serializer);
+          sse_encode_bool(down, serializer);
+          sse_encode_i_16(wheelDeltaV, serializer);
+          sse_encode_i_16(wheelDeltaH, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSendPointerEventConstMeta,
+        argValues: [that, x, y, buttonMask, down, wheelDeltaV, wheelDeltaH],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSendPointerEventConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_send_pointer_event",
+        argNames: [
+          "that",
+          "x",
+          "y",
+          "buttonMask",
+          "down",
+          "wheelDeltaV",
+          "wheelDeltaH",
+        ],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSendScancode({
+    required FfiSessionHandle that,
+    required int code,
+    required bool extended,
+    required bool down,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_u_8(code, serializer);
+          sse_encode_bool(extended, serializer);
+          sse_encode_bool(down, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSendScancodeConstMeta,
+        argValues: [that, code, extended, down],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSendScancodeConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_send_scancode",
+        argNames: ["that", "code", "extended", "down"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSendUnicode({
+    required FfiSessionHandle that,
+    required int codeUnit,
+    required bool down,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_u_16(codeUnit, serializer);
+          sse_encode_bool(down, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSendUnicodeConstMeta,
+        argValues: [that, codeUnit, down],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSendUnicodeConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_send_unicode",
+        argNames: ["that", "codeUnit", "down"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSetAudioMute({
+    required FfiSessionHandle that,
+    required bool muted,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_bool(muted, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSetAudioMuteConstMeta,
+        argValues: [that, muted],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSetAudioMuteConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_set_audio_mute",
+        argNames: ["that", "muted"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSetAudioVolume({
+    required FfiSessionHandle that,
+    required double volume,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_f_32(volume, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSetAudioVolumeConstMeta,
+        argValues: [that, volume],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSetAudioVolumeConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_set_audio_volume",
+        argNames: ["that", "volume"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSubmitCertDecision({
+    required FfiSessionHandle that,
+    required FfiCertTrustDecision decision,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_ffi_cert_trust_decision(decision, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSubmitCertDecisionConstMeta,
+        argValues: [that, decision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSubmitCertDecisionConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_submit_cert_decision",
+        argNames: ["that", "decision"],
+      );
+
+  @override
+  void crateApiFfiSessionHandleSubmitCredentials({
+    required FfiSessionHandle that,
+    required FfiCredentials creds,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_box_autoadd_ffi_credentials(creds, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiFfiSessionHandleSubmitCredentialsConstMeta,
+        argValues: [that, creds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSubmitCredentialsConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_submit_credentials",
+        argNames: ["that", "creds"],
+      );
+
+  @override
+  Stream<FfiSessionEvent> crateApiFfiSessionHandleSubscribeEvents({
+    required FfiSessionHandle that,
+  }) {
+    final events = RustStreamSink<FfiSessionEvent>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+              that,
+              serializer,
+            );
+            sse_encode_StreamSink_ffi_session_event_Sse(events, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 12,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_AnyhowException,
+          ),
+          constMeta: kCrateApiFfiSessionHandleSubscribeEventsConstMeta,
+          argValues: [that, events],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return events.stream;
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleSubscribeEventsConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_subscribe_events",
+        argNames: ["that", "events"],
+      );
+
+  @override
+  Future<FfiFramePatch?> crateApiFfiSessionHandleTakeFramePatch({
+    required FfiSessionHandle that,
+    required bool forceFull,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+            that,
+            serializer,
+          );
+          sse_encode_bool(forceFull, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 13,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_ffi_frame_patch,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiFfiSessionHandleTakeFramePatchConstMeta,
+        argValues: [that, forceFull],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiFfiSessionHandleTakeFramePatchConstMeta =>
+      const TaskConstMeta(
+        debugName: "FfiSessionHandle_take_frame_patch",
+        argNames: ["that", "forceFull"],
+      );
+
+  @override
+  FfiSessionHandle crateApiCreateSession({
+    required FfiConnectConfig config,
+    FfiCredentials? initialCreds,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_ffi_connect_config(config, serializer);
+          sse_encode_opt_box_autoadd_ffi_credentials(initialCreds, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiCreateSessionConstMeta,
+        argValues: [config, initialCreds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiCreateSessionConstMeta => const TaskConstMeta(
+    debugName: "create_session",
+    argNames: ["config", "initialCreds"],
+  );
+
+  @override
   String crateApiFingerprintSha256Hex({required List<int> derBytes}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_list_prim_u_8_loose(derBytes, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -128,7 +700,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_rdp_engine_summary,
@@ -159,7 +731,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_16(port, serializer);
           sse_encode_u_16(width, serializer);
           sse_encode_u_16(height, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -177,10 +749,53 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     argNames: ["host", "port", "width", "height"],
   );
 
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_FfiSessionHandle => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_FfiSessionHandle => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle;
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return AnyhowException(raw as String);
+  }
+
+  @protected
+  FfiSessionHandle
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiSessionHandleImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  FfiSessionHandle
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiSessionHandleImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  FfiSessionHandle
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiSessionHandleImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  RustStreamSink<FfiSessionEvent> dco_decode_StreamSink_ffi_session_event_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
   }
 
   @protected
@@ -196,6 +811,232 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  FfiCertInfo dco_decode_box_autoadd_ffi_cert_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ffi_cert_info(raw);
+  }
+
+  @protected
+  FfiConnectConfig dco_decode_box_autoadd_ffi_connect_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ffi_connect_config(raw);
+  }
+
+  @protected
+  FfiCredentials dco_decode_box_autoadd_ffi_credentials(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ffi_credentials(raw);
+  }
+
+  @protected
+  FfiFramePatch dco_decode_box_autoadd_ffi_frame_patch(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ffi_frame_patch(raw);
+  }
+
+  @protected
+  FfiSessionState dco_decode_box_autoadd_ffi_session_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_ffi_session_state(raw);
+  }
+
+  @protected
+  double dco_decode_f_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as double;
+  }
+
+  @protected
+  FfiAudioMode dco_decode_ffi_audio_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiAudioMode.values[raw as int];
+  }
+
+  @protected
+  FfiAudioReadResult dco_decode_ffi_audio_read_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return FfiAudioReadResult(
+      pcmBytes: dco_decode_list_prim_u_8_strict(arr[0]),
+      framesRead: dco_decode_u_32(arr[1]),
+      queuedMs: dco_decode_u_32(arr[2]),
+      driftMs: dco_decode_i_64(arr[3]),
+      drops: dco_decode_u_64(arr[4]),
+      underruns: dco_decode_u_64(arr[5]),
+      waveConfirmsSent: dco_decode_u_64(arr[6]),
+      sampleRate: dco_decode_u_32(arr[7]),
+      channels: dco_decode_u_16(arr[8]),
+      bitsPerSample: dco_decode_u_16(arr[9]),
+    );
+  }
+
+  @protected
+  FfiCertInfo dco_decode_ffi_cert_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return FfiCertInfo(
+      sha256Hex: dco_decode_String(arr[0]),
+      subjectCn: dco_decode_opt_String(arr[1]),
+      sanEntries: dco_decode_list_String(arr[2]),
+      issuer: dco_decode_String(arr[3]),
+      notBefore: dco_decode_String(arr[4]),
+      notAfter: dco_decode_String(arr[5]),
+      derBytes: dco_decode_list_prim_u_8_strict(arr[6]),
+    );
+  }
+
+  @protected
+  FfiCertTrustDecision dco_decode_ffi_cert_trust_decision(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiCertTrustDecision.values[raw as int];
+  }
+
+  @protected
+  FfiConnectConfig dco_decode_ffi_connect_config(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return FfiConnectConfig(
+      host: dco_decode_String(arr[0]),
+      port: dco_decode_u_16(arr[1]),
+      width: dco_decode_u_16(arr[2]),
+      height: dco_decode_u_16(arr[3]),
+      scaleFactor: dco_decode_u_32(arr[4]),
+      securityMode: dco_decode_ffi_security_mode(arr[5]),
+      audioMode: dco_decode_ffi_audio_mode(arr[6]),
+      clientName: dco_decode_String(arr[7]),
+      pinnedCertSha256: dco_decode_opt_String(arr[8]),
+      enableServerPointer: dco_decode_bool(arr[9]),
+      pointerSoftwareRendering: dco_decode_bool(arr[10]),
+    );
+  }
+
+  @protected
+  FfiCredentials dco_decode_ffi_credentials(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return FfiCredentials(
+      username: dco_decode_String(arr[0]),
+      domain: dco_decode_opt_String(arr[1]),
+      password: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  FfiFramePatch dco_decode_ffi_frame_patch(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return FfiFramePatch(
+      x: dco_decode_u_16(arr[0]),
+      y: dco_decode_u_16(arr[1]),
+      w: dco_decode_u_16(arr[2]),
+      h: dco_decode_u_16(arr[3]),
+      fbWidth: dco_decode_u_16(arr[4]),
+      fbHeight: dco_decode_u_16(arr[5]),
+      isFullFrame: dco_decode_bool(arr[6]),
+      rgbaBytes: dco_decode_list_prim_u_8_strict(arr[7]),
+    );
+  }
+
+  @protected
+  FfiSecurityMode dco_decode_ffi_security_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiSecurityMode.values[raw as int];
+  }
+
+  @protected
+  FfiSessionEvent dco_decode_ffi_session_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 21)
+      throw Exception('unexpected arr length: expect 21 but see ${arr.length}');
+    return FfiSessionEvent(
+      kind: dco_decode_ffi_session_event_kind(arr[0]),
+      state: dco_decode_opt_box_autoadd_ffi_session_state(arr[1]),
+      dirtyX: dco_decode_u_16(arr[2]),
+      dirtyY: dco_decode_u_16(arr[3]),
+      dirtyW: dco_decode_u_16(arr[4]),
+      dirtyH: dco_decode_u_16(arr[5]),
+      width: dco_decode_u_16(arr[6]),
+      height: dco_decode_u_16(arr[7]),
+      frameSync: dco_decode_bool(arr[8]),
+      presentationMs: dco_decode_u_64(arr[9]),
+      cursorX: dco_decode_u_16(arr[10]),
+      cursorY: dco_decode_u_16(arr[11]),
+      cursorVisible: dco_decode_bool(arr[12]),
+      cursorHotspotX: dco_decode_u_16(arr[13]),
+      cursorHotspotY: dco_decode_u_16(arr[14]),
+      cursorRgbaPixels: dco_decode_list_prim_u_8_strict(arr[15]),
+      sampleRate: dco_decode_u_32(arr[16]),
+      channels: dco_decode_u_16(arr[17]),
+      bitsPerSample: dco_decode_u_16(arr[18]),
+      volumeLeft: dco_decode_u_16(arr[19]),
+      volumeRight: dco_decode_u_16(arr[20]),
+    );
+  }
+
+  @protected
+  FfiSessionEventKind dco_decode_ffi_session_event_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiSessionEventKind.values[raw as int];
+  }
+
+  @protected
+  FfiSessionState dco_decode_ffi_session_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return FfiSessionState(
+      kind: dco_decode_ffi_session_state_kind(arr[0]),
+      cert: dco_decode_opt_box_autoadd_ffi_cert_info(arr[1]),
+      reason: dco_decode_opt_String(arr[2]),
+      width: dco_decode_u_16(arr[3]),
+      height: dco_decode_u_16(arr[4]),
+      clean: dco_decode_bool(arr[5]),
+    );
+  }
+
+  @protected
+  FfiSessionStateKind dco_decode_ffi_session_state_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiSessionStateKind.values[raw as int];
+  }
+
+  @protected
+  int dco_decode_i_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  int dco_decode_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
+  }
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as List<int>;
@@ -205,6 +1046,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  FfiCertInfo? dco_decode_opt_box_autoadd_ffi_cert_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ffi_cert_info(raw);
+  }
+
+  @protected
+  FfiCredentials? dco_decode_opt_box_autoadd_ffi_credentials(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ffi_credentials(raw);
+  }
+
+  @protected
+  FfiFramePatch? dco_decode_opt_box_autoadd_ffi_frame_patch(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ffi_frame_patch(raw);
+  }
+
+  @protected
+  FfiSessionState? dco_decode_opt_box_autoadd_ffi_session_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_ffi_session_state(raw);
   }
 
   @protected
@@ -229,6 +1100,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeU64(raw);
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -241,10 +1124,60 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  BigInt dco_decode_usize(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeU64(raw);
+  }
+
+  @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_String(deserializer);
     return AnyhowException(inner);
+  }
+
+  @protected
+  FfiSessionHandle
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return FfiSessionHandleImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  FfiSessionHandle
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return FfiSessionHandleImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  FfiSessionHandle
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return FfiSessionHandleImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  RustStreamSink<FfiSessionEvent> sse_decode_StreamSink_ffi_session_event_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
   }
 
   @protected
@@ -261,6 +1194,306 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  FfiCertInfo sse_decode_box_autoadd_ffi_cert_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ffi_cert_info(deserializer));
+  }
+
+  @protected
+  FfiConnectConfig sse_decode_box_autoadd_ffi_connect_config(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ffi_connect_config(deserializer));
+  }
+
+  @protected
+  FfiCredentials sse_decode_box_autoadd_ffi_credentials(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ffi_credentials(deserializer));
+  }
+
+  @protected
+  FfiFramePatch sse_decode_box_autoadd_ffi_frame_patch(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ffi_frame_patch(deserializer));
+  }
+
+  @protected
+  FfiSessionState sse_decode_box_autoadd_ffi_session_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_ffi_session_state(deserializer));
+  }
+
+  @protected
+  double sse_decode_f_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getFloat32();
+  }
+
+  @protected
+  FfiAudioMode sse_decode_ffi_audio_mode(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return FfiAudioMode.values[inner];
+  }
+
+  @protected
+  FfiAudioReadResult sse_decode_ffi_audio_read_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_pcmBytes = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_framesRead = sse_decode_u_32(deserializer);
+    var var_queuedMs = sse_decode_u_32(deserializer);
+    var var_driftMs = sse_decode_i_64(deserializer);
+    var var_drops = sse_decode_u_64(deserializer);
+    var var_underruns = sse_decode_u_64(deserializer);
+    var var_waveConfirmsSent = sse_decode_u_64(deserializer);
+    var var_sampleRate = sse_decode_u_32(deserializer);
+    var var_channels = sse_decode_u_16(deserializer);
+    var var_bitsPerSample = sse_decode_u_16(deserializer);
+    return FfiAudioReadResult(
+      pcmBytes: var_pcmBytes,
+      framesRead: var_framesRead,
+      queuedMs: var_queuedMs,
+      driftMs: var_driftMs,
+      drops: var_drops,
+      underruns: var_underruns,
+      waveConfirmsSent: var_waveConfirmsSent,
+      sampleRate: var_sampleRate,
+      channels: var_channels,
+      bitsPerSample: var_bitsPerSample,
+    );
+  }
+
+  @protected
+  FfiCertInfo sse_decode_ffi_cert_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sha256Hex = sse_decode_String(deserializer);
+    var var_subjectCn = sse_decode_opt_String(deserializer);
+    var var_sanEntries = sse_decode_list_String(deserializer);
+    var var_issuer = sse_decode_String(deserializer);
+    var var_notBefore = sse_decode_String(deserializer);
+    var var_notAfter = sse_decode_String(deserializer);
+    var var_derBytes = sse_decode_list_prim_u_8_strict(deserializer);
+    return FfiCertInfo(
+      sha256Hex: var_sha256Hex,
+      subjectCn: var_subjectCn,
+      sanEntries: var_sanEntries,
+      issuer: var_issuer,
+      notBefore: var_notBefore,
+      notAfter: var_notAfter,
+      derBytes: var_derBytes,
+    );
+  }
+
+  @protected
+  FfiCertTrustDecision sse_decode_ffi_cert_trust_decision(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return FfiCertTrustDecision.values[inner];
+  }
+
+  @protected
+  FfiConnectConfig sse_decode_ffi_connect_config(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_host = sse_decode_String(deserializer);
+    var var_port = sse_decode_u_16(deserializer);
+    var var_width = sse_decode_u_16(deserializer);
+    var var_height = sse_decode_u_16(deserializer);
+    var var_scaleFactor = sse_decode_u_32(deserializer);
+    var var_securityMode = sse_decode_ffi_security_mode(deserializer);
+    var var_audioMode = sse_decode_ffi_audio_mode(deserializer);
+    var var_clientName = sse_decode_String(deserializer);
+    var var_pinnedCertSha256 = sse_decode_opt_String(deserializer);
+    var var_enableServerPointer = sse_decode_bool(deserializer);
+    var var_pointerSoftwareRendering = sse_decode_bool(deserializer);
+    return FfiConnectConfig(
+      host: var_host,
+      port: var_port,
+      width: var_width,
+      height: var_height,
+      scaleFactor: var_scaleFactor,
+      securityMode: var_securityMode,
+      audioMode: var_audioMode,
+      clientName: var_clientName,
+      pinnedCertSha256: var_pinnedCertSha256,
+      enableServerPointer: var_enableServerPointer,
+      pointerSoftwareRendering: var_pointerSoftwareRendering,
+    );
+  }
+
+  @protected
+  FfiCredentials sse_decode_ffi_credentials(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_username = sse_decode_String(deserializer);
+    var var_domain = sse_decode_opt_String(deserializer);
+    var var_password = sse_decode_String(deserializer);
+    return FfiCredentials(
+      username: var_username,
+      domain: var_domain,
+      password: var_password,
+    );
+  }
+
+  @protected
+  FfiFramePatch sse_decode_ffi_frame_patch(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_x = sse_decode_u_16(deserializer);
+    var var_y = sse_decode_u_16(deserializer);
+    var var_w = sse_decode_u_16(deserializer);
+    var var_h = sse_decode_u_16(deserializer);
+    var var_fbWidth = sse_decode_u_16(deserializer);
+    var var_fbHeight = sse_decode_u_16(deserializer);
+    var var_isFullFrame = sse_decode_bool(deserializer);
+    var var_rgbaBytes = sse_decode_list_prim_u_8_strict(deserializer);
+    return FfiFramePatch(
+      x: var_x,
+      y: var_y,
+      w: var_w,
+      h: var_h,
+      fbWidth: var_fbWidth,
+      fbHeight: var_fbHeight,
+      isFullFrame: var_isFullFrame,
+      rgbaBytes: var_rgbaBytes,
+    );
+  }
+
+  @protected
+  FfiSecurityMode sse_decode_ffi_security_mode(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return FfiSecurityMode.values[inner];
+  }
+
+  @protected
+  FfiSessionEvent sse_decode_ffi_session_event(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_ffi_session_event_kind(deserializer);
+    var var_state = sse_decode_opt_box_autoadd_ffi_session_state(deserializer);
+    var var_dirtyX = sse_decode_u_16(deserializer);
+    var var_dirtyY = sse_decode_u_16(deserializer);
+    var var_dirtyW = sse_decode_u_16(deserializer);
+    var var_dirtyH = sse_decode_u_16(deserializer);
+    var var_width = sse_decode_u_16(deserializer);
+    var var_height = sse_decode_u_16(deserializer);
+    var var_frameSync = sse_decode_bool(deserializer);
+    var var_presentationMs = sse_decode_u_64(deserializer);
+    var var_cursorX = sse_decode_u_16(deserializer);
+    var var_cursorY = sse_decode_u_16(deserializer);
+    var var_cursorVisible = sse_decode_bool(deserializer);
+    var var_cursorHotspotX = sse_decode_u_16(deserializer);
+    var var_cursorHotspotY = sse_decode_u_16(deserializer);
+    var var_cursorRgbaPixels = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_sampleRate = sse_decode_u_32(deserializer);
+    var var_channels = sse_decode_u_16(deserializer);
+    var var_bitsPerSample = sse_decode_u_16(deserializer);
+    var var_volumeLeft = sse_decode_u_16(deserializer);
+    var var_volumeRight = sse_decode_u_16(deserializer);
+    return FfiSessionEvent(
+      kind: var_kind,
+      state: var_state,
+      dirtyX: var_dirtyX,
+      dirtyY: var_dirtyY,
+      dirtyW: var_dirtyW,
+      dirtyH: var_dirtyH,
+      width: var_width,
+      height: var_height,
+      frameSync: var_frameSync,
+      presentationMs: var_presentationMs,
+      cursorX: var_cursorX,
+      cursorY: var_cursorY,
+      cursorVisible: var_cursorVisible,
+      cursorHotspotX: var_cursorHotspotX,
+      cursorHotspotY: var_cursorHotspotY,
+      cursorRgbaPixels: var_cursorRgbaPixels,
+      sampleRate: var_sampleRate,
+      channels: var_channels,
+      bitsPerSample: var_bitsPerSample,
+      volumeLeft: var_volumeLeft,
+      volumeRight: var_volumeRight,
+    );
+  }
+
+  @protected
+  FfiSessionEventKind sse_decode_ffi_session_event_kind(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return FfiSessionEventKind.values[inner];
+  }
+
+  @protected
+  FfiSessionState sse_decode_ffi_session_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_ffi_session_state_kind(deserializer);
+    var var_cert = sse_decode_opt_box_autoadd_ffi_cert_info(deserializer);
+    var var_reason = sse_decode_opt_String(deserializer);
+    var var_width = sse_decode_u_16(deserializer);
+    var var_height = sse_decode_u_16(deserializer);
+    var var_clean = sse_decode_bool(deserializer);
+    return FfiSessionState(
+      kind: var_kind,
+      cert: var_cert,
+      reason: var_reason,
+      width: var_width,
+      height: var_height,
+      clean: var_clean,
+    );
+  }
+
+  @protected
+  FfiSessionStateKind sse_decode_ffi_session_state_kind(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return FfiSessionStateKind.values[inner];
+  }
+
+  @protected
+  int sse_decode_i_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getInt16();
+  }
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getInt32();
+  }
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
+  }
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <String>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -272,6 +1505,69 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  FfiCertInfo? sse_decode_opt_box_autoadd_ffi_cert_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ffi_cert_info(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  FfiCredentials? sse_decode_opt_box_autoadd_ffi_credentials(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ffi_credentials(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  FfiFramePatch? sse_decode_opt_box_autoadd_ffi_frame_patch(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ffi_frame_patch(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  FfiSessionState? sse_decode_opt_box_autoadd_ffi_session_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_ffi_session_state(deserializer));
+    } else {
+      return null;
+    }
   }
 
   @protected
@@ -298,6 +1594,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
+  }
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getBigUint64();
+  }
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -309,9 +1617,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  int sse_decode_i_32(SseDeserializer deserializer) {
+  BigInt sse_decode_usize(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getInt32();
+    return deserializer.buffer.getBigUint64();
   }
 
   @protected
@@ -324,6 +1632,62 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    FfiSessionHandle self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as FfiSessionHandleImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    FfiSessionHandle self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as FfiSessionHandleImpl).frbInternalSseEncode(move: false),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFfiSessionHandle(
+    FfiSessionHandle self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as FfiSessionHandleImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_ffi_session_event_Sse(
+    RustStreamSink<FfiSessionEvent> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_ffi_session_event,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
@@ -333,6 +1697,245 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ffi_cert_info(
+    FfiCertInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_cert_info(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ffi_connect_config(
+    FfiConnectConfig self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_connect_config(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ffi_credentials(
+    FfiCredentials self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_credentials(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ffi_frame_patch(
+    FfiFramePatch self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_frame_patch(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_ffi_session_state(
+    FfiSessionState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_session_state(self, serializer);
+  }
+
+  @protected
+  void sse_encode_f_32(double self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putFloat32(self);
+  }
+
+  @protected
+  void sse_encode_ffi_audio_mode(FfiAudioMode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_audio_read_result(
+    FfiAudioReadResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_prim_u_8_strict(self.pcmBytes, serializer);
+    sse_encode_u_32(self.framesRead, serializer);
+    sse_encode_u_32(self.queuedMs, serializer);
+    sse_encode_i_64(self.driftMs, serializer);
+    sse_encode_u_64(self.drops, serializer);
+    sse_encode_u_64(self.underruns, serializer);
+    sse_encode_u_64(self.waveConfirmsSent, serializer);
+    sse_encode_u_32(self.sampleRate, serializer);
+    sse_encode_u_16(self.channels, serializer);
+    sse_encode_u_16(self.bitsPerSample, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_cert_info(FfiCertInfo self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sha256Hex, serializer);
+    sse_encode_opt_String(self.subjectCn, serializer);
+    sse_encode_list_String(self.sanEntries, serializer);
+    sse_encode_String(self.issuer, serializer);
+    sse_encode_String(self.notBefore, serializer);
+    sse_encode_String(self.notAfter, serializer);
+    sse_encode_list_prim_u_8_strict(self.derBytes, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_cert_trust_decision(
+    FfiCertTrustDecision self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_connect_config(
+    FfiConnectConfig self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.host, serializer);
+    sse_encode_u_16(self.port, serializer);
+    sse_encode_u_16(self.width, serializer);
+    sse_encode_u_16(self.height, serializer);
+    sse_encode_u_32(self.scaleFactor, serializer);
+    sse_encode_ffi_security_mode(self.securityMode, serializer);
+    sse_encode_ffi_audio_mode(self.audioMode, serializer);
+    sse_encode_String(self.clientName, serializer);
+    sse_encode_opt_String(self.pinnedCertSha256, serializer);
+    sse_encode_bool(self.enableServerPointer, serializer);
+    sse_encode_bool(self.pointerSoftwareRendering, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_credentials(
+    FfiCredentials self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.username, serializer);
+    sse_encode_opt_String(self.domain, serializer);
+    sse_encode_String(self.password, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_frame_patch(
+    FfiFramePatch self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_16(self.x, serializer);
+    sse_encode_u_16(self.y, serializer);
+    sse_encode_u_16(self.w, serializer);
+    sse_encode_u_16(self.h, serializer);
+    sse_encode_u_16(self.fbWidth, serializer);
+    sse_encode_u_16(self.fbHeight, serializer);
+    sse_encode_bool(self.isFullFrame, serializer);
+    sse_encode_list_prim_u_8_strict(self.rgbaBytes, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_security_mode(
+    FfiSecurityMode self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_session_event(
+    FfiSessionEvent self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_session_event_kind(self.kind, serializer);
+    sse_encode_opt_box_autoadd_ffi_session_state(self.state, serializer);
+    sse_encode_u_16(self.dirtyX, serializer);
+    sse_encode_u_16(self.dirtyY, serializer);
+    sse_encode_u_16(self.dirtyW, serializer);
+    sse_encode_u_16(self.dirtyH, serializer);
+    sse_encode_u_16(self.width, serializer);
+    sse_encode_u_16(self.height, serializer);
+    sse_encode_bool(self.frameSync, serializer);
+    sse_encode_u_64(self.presentationMs, serializer);
+    sse_encode_u_16(self.cursorX, serializer);
+    sse_encode_u_16(self.cursorY, serializer);
+    sse_encode_bool(self.cursorVisible, serializer);
+    sse_encode_u_16(self.cursorHotspotX, serializer);
+    sse_encode_u_16(self.cursorHotspotY, serializer);
+    sse_encode_list_prim_u_8_strict(self.cursorRgbaPixels, serializer);
+    sse_encode_u_32(self.sampleRate, serializer);
+    sse_encode_u_16(self.channels, serializer);
+    sse_encode_u_16(self.bitsPerSample, serializer);
+    sse_encode_u_16(self.volumeLeft, serializer);
+    sse_encode_u_16(self.volumeRight, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_session_event_kind(
+    FfiSessionEventKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_session_state(
+    FfiSessionState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_ffi_session_state_kind(self.kind, serializer);
+    sse_encode_opt_box_autoadd_ffi_cert_info(self.cert, serializer);
+    sse_encode_opt_String(self.reason, serializer);
+    sse_encode_u_16(self.width, serializer);
+    sse_encode_u_16(self.height, serializer);
+    sse_encode_bool(self.clean, serializer);
+  }
+
+  @protected
+  void sse_encode_ffi_session_state_kind(
+    FfiSessionStateKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_i_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putInt16(self);
+  }
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putInt32(self);
+  }
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
+  }
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_String(item, serializer);
+    }
   }
 
   @protected
@@ -358,6 +1961,68 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_cert_info(
+    FfiCertInfo? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ffi_cert_info(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_credentials(
+    FfiCredentials? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ffi_credentials(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_frame_patch(
+    FfiFramePatch? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ffi_frame_patch(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_ffi_session_state(
+    FfiSessionState? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_ffi_session_state(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_rdp_engine_summary(
     RdpEngineSummary self,
     SseSerializer serializer,
@@ -377,6 +2042,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
+  }
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putBigUint64(self);
+  }
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -388,8 +2065,110 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_i_32(int self, SseSerializer serializer) {
+  void sse_encode_usize(BigInt self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putInt32(self);
+    serializer.buffer.putBigUint64(self);
   }
+}
+
+@sealed
+class FfiSessionHandleImpl extends RustOpaque implements FfiSessionHandle {
+  // Not to be used by end users
+  FfiSessionHandleImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  FfiSessionHandleImpl.frbInternalSseDecode(
+    BigInt ptr,
+    int externalSizeOnNative,
+  ) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_FfiSessionHandle,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_FfiSessionHandle,
+    rustArcDecrementStrongCountPtr: RustLib
+        .instance
+        .api
+        .rust_arc_decrement_strong_count_FfiSessionHandlePtr,
+  );
+
+  FfiCertInfo? certInfo() =>
+      RustLib.instance.api.crateApiFfiSessionHandleCertInfo(that: this);
+
+  void disconnect() =>
+      RustLib.instance.api.crateApiFfiSessionHandleDisconnect(that: this);
+
+  String framebufferSha256Hex() => RustLib.instance.api
+      .crateApiFfiSessionHandleFramebufferSha256Hex(that: this);
+
+  FfiAudioReadResult readAudioPcm({
+    required int requestedFrames,
+    required int framesPlayedSinceLastRead,
+  }) => RustLib.instance.api.crateApiFfiSessionHandleReadAudioPcm(
+    that: this,
+    requestedFrames: requestedFrames,
+    framesPlayedSinceLastRead: framesPlayedSinceLastRead,
+  );
+
+  void sendPointerEvent({
+    required int x,
+    required int y,
+    required int buttonMask,
+    required bool down,
+    required int wheelDeltaV,
+    required int wheelDeltaH,
+  }) => RustLib.instance.api.crateApiFfiSessionHandleSendPointerEvent(
+    that: this,
+    x: x,
+    y: y,
+    buttonMask: buttonMask,
+    down: down,
+    wheelDeltaV: wheelDeltaV,
+    wheelDeltaH: wheelDeltaH,
+  );
+
+  void sendScancode({
+    required int code,
+    required bool extended,
+    required bool down,
+  }) => RustLib.instance.api.crateApiFfiSessionHandleSendScancode(
+    that: this,
+    code: code,
+    extended: extended,
+    down: down,
+  );
+
+  void sendUnicode({required int codeUnit, required bool down}) =>
+      RustLib.instance.api.crateApiFfiSessionHandleSendUnicode(
+        that: this,
+        codeUnit: codeUnit,
+        down: down,
+      );
+
+  void setAudioMute({required bool muted}) => RustLib.instance.api
+      .crateApiFfiSessionHandleSetAudioMute(that: this, muted: muted);
+
+  void setAudioVolume({required double volume}) => RustLib.instance.api
+      .crateApiFfiSessionHandleSetAudioVolume(that: this, volume: volume);
+
+  void submitCertDecision({required FfiCertTrustDecision decision}) =>
+      RustLib.instance.api.crateApiFfiSessionHandleSubmitCertDecision(
+        that: this,
+        decision: decision,
+      );
+
+  void submitCredentials({required FfiCredentials creds}) => RustLib
+      .instance
+      .api
+      .crateApiFfiSessionHandleSubmitCredentials(that: this, creds: creds);
+
+  Stream<FfiSessionEvent> subscribeEvents() =>
+      RustLib.instance.api.crateApiFfiSessionHandleSubscribeEvents(that: this);
+
+  Future<FfiFramePatch?> takeFramePatch({required bool forceFull}) => RustLib
+      .instance
+      .api
+      .crateApiFfiSessionHandleTakeFramePatch(that: this, forceFull: forceFull);
 }

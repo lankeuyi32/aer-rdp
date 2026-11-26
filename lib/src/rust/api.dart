@@ -6,7 +6,8 @@
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `eq`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `coalesce_dirty_rect`, `extract_frame_patch`, `read_audio_from_buffer`, `runtime`, `to_core_config`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 RdpEngineSummary getEngineSummary() =>
     RustLib.instance.api.crateApiGetEngineSummary();
@@ -25,6 +26,446 @@ void validateEndpoint({
 
 String fingerprintSha256Hex({required List<int> derBytes}) =>
     RustLib.instance.api.crateApiFingerprintSha256Hex(derBytes: derBytes);
+
+FfiSessionHandle createSession({
+  required FfiConnectConfig config,
+  FfiCredentials? initialCreds,
+}) => RustLib.instance.api.crateApiCreateSession(
+  config: config,
+  initialCreds: initialCreds,
+);
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FfiSessionHandle>>
+abstract class FfiSessionHandle implements RustOpaqueInterface {
+  FfiCertInfo? certInfo();
+
+  void disconnect();
+
+  String framebufferSha256Hex();
+
+  FfiAudioReadResult readAudioPcm({
+    required int requestedFrames,
+    required int framesPlayedSinceLastRead,
+  });
+
+  void sendPointerEvent({
+    required int x,
+    required int y,
+    required int buttonMask,
+    required bool down,
+    required int wheelDeltaV,
+    required int wheelDeltaH,
+  });
+
+  void sendScancode({
+    required int code,
+    required bool extended,
+    required bool down,
+  });
+
+  void sendUnicode({required int codeUnit, required bool down});
+
+  void setAudioMute({required bool muted});
+
+  void setAudioVolume({required double volume});
+
+  void submitCertDecision({required FfiCertTrustDecision decision});
+
+  void submitCredentials({required FfiCredentials creds});
+
+  Stream<FfiSessionEvent> subscribeEvents();
+
+  Future<FfiFramePatch?> takeFramePatch({required bool forceFull});
+}
+
+enum FfiAudioMode { local, remote, off }
+
+class FfiAudioReadResult {
+  final Uint8List pcmBytes;
+  final int framesRead;
+  final int queuedMs;
+  final PlatformInt64 driftMs;
+  final BigInt drops;
+  final BigInt underruns;
+  final BigInt waveConfirmsSent;
+  final int sampleRate;
+  final int channels;
+  final int bitsPerSample;
+
+  const FfiAudioReadResult({
+    required this.pcmBytes,
+    required this.framesRead,
+    required this.queuedMs,
+    required this.driftMs,
+    required this.drops,
+    required this.underruns,
+    required this.waveConfirmsSent,
+    required this.sampleRate,
+    required this.channels,
+    required this.bitsPerSample,
+  });
+
+  @override
+  int get hashCode =>
+      pcmBytes.hashCode ^
+      framesRead.hashCode ^
+      queuedMs.hashCode ^
+      driftMs.hashCode ^
+      drops.hashCode ^
+      underruns.hashCode ^
+      waveConfirmsSent.hashCode ^
+      sampleRate.hashCode ^
+      channels.hashCode ^
+      bitsPerSample.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiAudioReadResult &&
+          runtimeType == other.runtimeType &&
+          pcmBytes == other.pcmBytes &&
+          framesRead == other.framesRead &&
+          queuedMs == other.queuedMs &&
+          driftMs == other.driftMs &&
+          drops == other.drops &&
+          underruns == other.underruns &&
+          waveConfirmsSent == other.waveConfirmsSent &&
+          sampleRate == other.sampleRate &&
+          channels == other.channels &&
+          bitsPerSample == other.bitsPerSample;
+}
+
+class FfiCertInfo {
+  final String sha256Hex;
+  final String? subjectCn;
+  final List<String> sanEntries;
+  final String issuer;
+  final String notBefore;
+  final String notAfter;
+  final Uint8List derBytes;
+
+  const FfiCertInfo({
+    required this.sha256Hex,
+    this.subjectCn,
+    required this.sanEntries,
+    required this.issuer,
+    required this.notBefore,
+    required this.notAfter,
+    required this.derBytes,
+  });
+
+  @override
+  int get hashCode =>
+      sha256Hex.hashCode ^
+      subjectCn.hashCode ^
+      sanEntries.hashCode ^
+      issuer.hashCode ^
+      notBefore.hashCode ^
+      notAfter.hashCode ^
+      derBytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiCertInfo &&
+          runtimeType == other.runtimeType &&
+          sha256Hex == other.sha256Hex &&
+          subjectCn == other.subjectCn &&
+          sanEntries == other.sanEntries &&
+          issuer == other.issuer &&
+          notBefore == other.notBefore &&
+          notAfter == other.notAfter &&
+          derBytes == other.derBytes;
+}
+
+enum FfiCertTrustDecision { trustOnce, trustAlways, reject }
+
+class FfiConnectConfig {
+  final String host;
+  final int port;
+  final int width;
+  final int height;
+  final int scaleFactor;
+  final FfiSecurityMode securityMode;
+  final FfiAudioMode audioMode;
+  final String clientName;
+  final String? pinnedCertSha256;
+  final bool enableServerPointer;
+  final bool pointerSoftwareRendering;
+
+  const FfiConnectConfig({
+    required this.host,
+    required this.port,
+    required this.width,
+    required this.height,
+    required this.scaleFactor,
+    required this.securityMode,
+    required this.audioMode,
+    required this.clientName,
+    this.pinnedCertSha256,
+    required this.enableServerPointer,
+    required this.pointerSoftwareRendering,
+  });
+
+  @override
+  int get hashCode =>
+      host.hashCode ^
+      port.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      scaleFactor.hashCode ^
+      securityMode.hashCode ^
+      audioMode.hashCode ^
+      clientName.hashCode ^
+      pinnedCertSha256.hashCode ^
+      enableServerPointer.hashCode ^
+      pointerSoftwareRendering.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiConnectConfig &&
+          runtimeType == other.runtimeType &&
+          host == other.host &&
+          port == other.port &&
+          width == other.width &&
+          height == other.height &&
+          scaleFactor == other.scaleFactor &&
+          securityMode == other.securityMode &&
+          audioMode == other.audioMode &&
+          clientName == other.clientName &&
+          pinnedCertSha256 == other.pinnedCertSha256 &&
+          enableServerPointer == other.enableServerPointer &&
+          pointerSoftwareRendering == other.pointerSoftwareRendering;
+}
+
+class FfiCredentials {
+  final String username;
+  final String? domain;
+  final String password;
+
+  const FfiCredentials({
+    required this.username,
+    this.domain,
+    required this.password,
+  });
+
+  @override
+  int get hashCode => username.hashCode ^ domain.hashCode ^ password.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiCredentials &&
+          runtimeType == other.runtimeType &&
+          username == other.username &&
+          domain == other.domain &&
+          password == other.password;
+}
+
+class FfiFramePatch {
+  final int x;
+  final int y;
+  final int w;
+  final int h;
+  final int fbWidth;
+  final int fbHeight;
+  final bool isFullFrame;
+  final Uint8List rgbaBytes;
+
+  const FfiFramePatch({
+    required this.x,
+    required this.y,
+    required this.w,
+    required this.h,
+    required this.fbWidth,
+    required this.fbHeight,
+    required this.isFullFrame,
+    required this.rgbaBytes,
+  });
+
+  @override
+  int get hashCode =>
+      x.hashCode ^
+      y.hashCode ^
+      w.hashCode ^
+      h.hashCode ^
+      fbWidth.hashCode ^
+      fbHeight.hashCode ^
+      isFullFrame.hashCode ^
+      rgbaBytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiFramePatch &&
+          runtimeType == other.runtimeType &&
+          x == other.x &&
+          y == other.y &&
+          w == other.w &&
+          h == other.h &&
+          fbWidth == other.fbWidth &&
+          fbHeight == other.fbHeight &&
+          isFullFrame == other.isFullFrame &&
+          rgbaBytes == other.rgbaBytes;
+}
+
+enum FfiSecurityMode { auto, nla, tls }
+
+class FfiSessionEvent {
+  final FfiSessionEventKind kind;
+  final FfiSessionState? state;
+  final int dirtyX;
+  final int dirtyY;
+  final int dirtyW;
+  final int dirtyH;
+  final int width;
+  final int height;
+  final bool frameSync;
+  final BigInt presentationMs;
+  final int cursorX;
+  final int cursorY;
+  final bool cursorVisible;
+  final int cursorHotspotX;
+  final int cursorHotspotY;
+  final Uint8List cursorRgbaPixels;
+  final int sampleRate;
+  final int channels;
+  final int bitsPerSample;
+  final int volumeLeft;
+  final int volumeRight;
+
+  const FfiSessionEvent({
+    required this.kind,
+    this.state,
+    required this.dirtyX,
+    required this.dirtyY,
+    required this.dirtyW,
+    required this.dirtyH,
+    required this.width,
+    required this.height,
+    required this.frameSync,
+    required this.presentationMs,
+    required this.cursorX,
+    required this.cursorY,
+    required this.cursorVisible,
+    required this.cursorHotspotX,
+    required this.cursorHotspotY,
+    required this.cursorRgbaPixels,
+    required this.sampleRate,
+    required this.channels,
+    required this.bitsPerSample,
+    required this.volumeLeft,
+    required this.volumeRight,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      state.hashCode ^
+      dirtyX.hashCode ^
+      dirtyY.hashCode ^
+      dirtyW.hashCode ^
+      dirtyH.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      frameSync.hashCode ^
+      presentationMs.hashCode ^
+      cursorX.hashCode ^
+      cursorY.hashCode ^
+      cursorVisible.hashCode ^
+      cursorHotspotX.hashCode ^
+      cursorHotspotY.hashCode ^
+      cursorRgbaPixels.hashCode ^
+      sampleRate.hashCode ^
+      channels.hashCode ^
+      bitsPerSample.hashCode ^
+      volumeLeft.hashCode ^
+      volumeRight.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiSessionEvent &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          state == other.state &&
+          dirtyX == other.dirtyX &&
+          dirtyY == other.dirtyY &&
+          dirtyW == other.dirtyW &&
+          dirtyH == other.dirtyH &&
+          width == other.width &&
+          height == other.height &&
+          frameSync == other.frameSync &&
+          presentationMs == other.presentationMs &&
+          cursorX == other.cursorX &&
+          cursorY == other.cursorY &&
+          cursorVisible == other.cursorVisible &&
+          cursorHotspotX == other.cursorHotspotX &&
+          cursorHotspotY == other.cursorHotspotY &&
+          cursorRgbaPixels == other.cursorRgbaPixels &&
+          sampleRate == other.sampleRate &&
+          channels == other.channels &&
+          bitsPerSample == other.bitsPerSample &&
+          volumeLeft == other.volumeLeft &&
+          volumeRight == other.volumeRight;
+}
+
+enum FfiSessionEventKind {
+  stateChanged,
+  frameUpdated,
+  cursorUpdated,
+  audioStreamOpened,
+  audioVolumeChanged,
+}
+
+class FfiSessionState {
+  final FfiSessionStateKind kind;
+  final FfiCertInfo? cert;
+  final String? reason;
+  final int width;
+  final int height;
+  final bool clean;
+
+  const FfiSessionState({
+    required this.kind,
+    this.cert,
+    this.reason,
+    required this.width,
+    required this.height,
+    required this.clean,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      cert.hashCode ^
+      reason.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      clean.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FfiSessionState &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          cert == other.cert &&
+          reason == other.reason &&
+          width == other.width &&
+          height == other.height &&
+          clean == other.clean;
+}
+
+enum FfiSessionStateKind {
+  connecting,
+  certPrompt,
+  authPrompt,
+  active,
+  reactivating,
+  disconnected,
+}
 
 class RdpEngineSummary {
   final String name;
