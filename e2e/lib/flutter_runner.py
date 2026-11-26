@@ -38,6 +38,45 @@ def flutter_executable() -> str | None:
     return shutil.which("flutter")
 
 
+def _decode_output(data: str | bytes | None) -> str:
+    if data is None:
+        return ""
+    if isinstance(data, bytes):
+        return data.decode("utf-8", errors="replace")
+    return data
+
+
+def _run_flutter_subprocess(cmd: list[str], *, timeout: float) -> FlutterRunResult:
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        out = _decode_output(exc.stdout)
+        err = _decode_output(exc.stderr)
+        timeout_msg = f"Command timed out after {timeout}s: {' '.join(cmd)}"
+        combined_err = f"{err}\n{timeout_msg}".strip() if err else timeout_msg
+        return FlutterRunResult(
+            returncode=124,
+            stdout=out,
+            stderr=combined_err,
+            command=cmd,
+        )
+    return FlutterRunResult(
+        returncode=proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+        command=cmd,
+    )
+
+
 def run_flutter_integration_tests(
     *,
     files: list[Path] | None = None,
@@ -56,22 +95,7 @@ def run_flutter_integration_tests(
     targets = [str(p.relative_to(REPO_ROOT)) for p in (files or sorted(INTEGRATION_TEST_DIR.glob("*_test.dart")))]
     target_device = device or "flutter-tester"
     cmd = [exe, "test", *targets, "-d", target_device]
-    proc = subprocess.run(
-        cmd,
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=timeout,
-        check=False,
-    )
-    return FlutterRunResult(
-        returncode=proc.returncode,
-        stdout=proc.stdout,
-        stderr=proc.stderr,
-        command=cmd,
-    )
+    return _run_flutter_subprocess(cmd, timeout=timeout)
 
 
 def run_flutter_analyze(timeout: float = 120.0) -> FlutterRunResult:
@@ -85,40 +109,11 @@ def run_flutter_analyze(timeout: float = 120.0) -> FlutterRunResult:
         )
     pkg_cfg = REPO_ROOT / ".dart_tool" / "package_config.json"
     if not pkg_cfg.is_file():
-        pub_get = subprocess.run(
-            [exe, "pub", "get"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
+        pub_get = _run_flutter_subprocess([exe, "pub", "get"], timeout=timeout)
         if pub_get.returncode != 0:
-            return FlutterRunResult(
-                returncode=pub_get.returncode,
-                stdout=pub_get.stdout,
-                stderr=pub_get.stderr,
-                command=[exe, "pub", "get"],
-            )
+            return pub_get
     cmd = [exe, "analyze"]
-    proc = subprocess.run(
-        cmd,
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=timeout,
-        check=False,
-    )
-    return FlutterRunResult(
-        returncode=proc.returncode,
-        stdout=proc.stdout,
-        stderr=proc.stderr,
-        command=cmd,
-    )
+    return _run_flutter_subprocess(cmd, timeout=timeout)
 
 
 def audit_integration_test_sources() -> dict[str, object]:

@@ -1618,3 +1618,76 @@ async fn active_sessions_does_not_leak_on_post_activation_error_or_tls_reject() 
     assert_eq!(m2.active_sessions, 0);
     tls_auth_srv.shutdown().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn odd_width_853x480_honored_without_stride_skew() {
+    let server = MockRdpServer::start(MockConfig {
+        auth_mode: AuthMode::Tls,
+        desktop_width: 1280,
+        desktop_height: 720,
+        pixel_encoding: PixelEncoding::Rdp6Rle32,
+        audio_hz: 0,
+        honor_client_desktop_size: true,
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    let cfg = ConnectConfig {
+        host: "127.0.0.1".to_owned(),
+        port: server.port(),
+        width: 853,
+        height: 480,
+        security_mode: SecurityMode::Tls,
+        audio_mode: AudioMode::Off,
+        pinned_cert_sha256: Some(server.cert_sha256().to_owned()),
+        ..Default::default()
+    };
+    let (handle, mut rx, _) = connect_and_accept_cert(cfg, None).await;
+
+    let ev = recv_until(&mut rx, Duration::from_secs(5), |e| {
+        matches!(
+            e,
+            SessionEvent::FrameUpdated {
+                frame_sync: true,
+                ..
+            }
+        )
+    })
+    .await
+    .expect("expected frame_sync FrameUpdated for 853x480");
+    assert!(matches!(ev, SessionEvent::FrameUpdated { frame_sync: true, .. }));
+
+    let (fb_w, fb_h, rgba) = handle.snapshot_rgba();
+    assert_eq!((fb_w, fb_h), (853, 480));
+    assert_eq!(rgba.len(), 853 * 480 * 4);
+
+    let px = |x: u16, y: u16| -> [u8; 3] {
+        let idx = (usize::from(y) * usize::from(fb_w) + usize::from(x)) * 4;
+        [rgba[idx], rgba[idx + 1], rgba[idx + 2]]
+    };
+
+    // Golden anchor strip on top-left
+    assert_eq!(px(4, 4), [255, 0, 0]);
+    assert_eq!(px(20, 4), [0, 255, 0]);
+    assert_eq!(px(36, 4), [0, 0, 255]);
+    assert_eq!(px(52, 4), [255, 255, 255]);
+
+    // Rightmost edge column (x = 852) across header and checkerboard bands (no stride skew)
+    assert_eq!(px(852, 4), [0x1E, 0x88, 0xE5], "rightmost header pixel");
+    assert_eq!(px(852, 64), [0x20, 0x24, 0x2C], "rightmost even checkerboard tile");
+    assert_eq!(px(852, 96), [0x2E, 0x34, 0x40], "rightmost odd checkerboard tile");
+    assert_eq!(px(852, 479), [0x20, 0x24, 0x2C], "bottom-right corner pixel");
+    assert_eq!(px(0, 64), [0x20, 0x24, 0x2C], "left edge row 64");
+    assert_eq!(px(0, 96), [0x2E, 0x34, 0x40], "left edge row 96");
+
+    handle.disconnect().unwrap();
+    let _ = recv_until(&mut rx, Duration::from_secs(3), |e| {
+        matches!(
+            e,
+            SessionEvent::SessionStateChanged(SessionState::Disconnected { .. })
+        )
+    })
+    .await;
+    server.shutdown().await;
+}

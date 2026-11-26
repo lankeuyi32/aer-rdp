@@ -118,7 +118,20 @@ void main() {
 
       await fillBounds('ZeroBounds', '0', '0', '1.0');
       expect(find.byKey(AerKeys.profileFormSave), findsOneWidget);
-      expect(find.text('ZeroBounds'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining('16384'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(AerKeys.connectionCenterPage),
+          matching: find.text('ZeroBounds'),
+        ),
+        findsNothing,
+      );
       expectNoOverflowErrors(tester);
     });
 
@@ -130,7 +143,7 @@ void main() {
           '办公电脑 🖥️ (Main) — ExtraLongWorkstationIdentifierForBoundaryLayoutTesting1234567890';
       await createProfileViaForm(tester, name: longName, host: '10.0.0.8');
       expectNoOverflowErrors(tester);
-      expect(find.textContaining('办公电脑'), findsOneWidget);
+      expect(find.text(longName), findsOneWidget);
 
       // Toggle favorite
       final Finder favOff = find.byIcon(Icons.star_border);
@@ -153,7 +166,7 @@ void main() {
       } else if (delSolid.evaluate().isNotEmpty) {
         await tester.tap(delSolid.first);
       } else {
-        await tester.longPress(find.textContaining('办公电脑'));
+        await tester.longPress(find.text(longName));
         await tester.pumpAndSettle();
         if (find.byIcon(Icons.delete_outline).evaluate().isNotEmpty) {
           await tester.tap(find.byIcon(Icons.delete_outline).first);
@@ -283,6 +296,54 @@ void main() {
     testWidgets('T2-FA07-05 App lifecycle paused and resumed handles audio cleanly', (
       WidgetTester tester,
     ) async {
+      const MethodChannel audioChannel = MethodChannel('dev.aer.rdp/audio');
+      final List<String> audioCalls = <String>[];
+      bool platformPaused = false;
+      int writesBeforePause = 0;
+      int writesWhilePaused = 0;
+      int pollsWhilePaused = 0;
+      int writesAfterResume = 0;
+      bool inPausedWindow = false;
+      bool inResumedWindow = false;
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        audioChannel,
+        (MethodCall call) async {
+          audioCalls.add(call.method);
+          switch (call.method) {
+            case 'open':
+              platformPaused = false;
+              return true;
+            case 'writePcm':
+              if (inPausedWindow) {
+                writesWhilePaused++;
+              } else if (inResumedWindow) {
+                writesAfterResume++;
+              } else {
+                writesBeforePause++;
+              }
+              return <String, Object>{'framesPlayedDelta': 882, 'paused': platformPaused};
+            case 'pollPlayoutDelta':
+              if (inPausedWindow) {
+                pollsWhilePaused++;
+              }
+              return <String, Object>{'framesPlayedDelta': 0, 'paused': platformPaused};
+            case 'pause':
+              platformPaused = true;
+              return null;
+            case 'resume':
+              platformPaused = false;
+              return null;
+            case 'close':
+              return null;
+          }
+          return null;
+        },
+      );
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(audioChannel, null);
+      });
+
       await pumpAerRdpApp(tester);
       await createProfileViaForm(
         tester,
@@ -295,10 +356,29 @@ void main() {
         profileName: 'LifecycleAudioHost',
       );
 
+      await tester.binding.delayed(const Duration(milliseconds: 60));
+      expect(audioCalls, contains('open'));
+      expect(writesBeforePause, greaterThan(0));
+
+      inPausedWindow = true;
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      await tester.pump();
+      await tester.binding.delayed(const Duration(milliseconds: 60));
+      inPausedWindow = false;
+      expect(audioCalls, contains('pause'));
+      expect(pollsWhilePaused, greaterThan(0));
+      expect(writesWhilePaused, 0);
+
+      inResumedWindow = true;
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
+      await tester.binding.delayed(const Duration(milliseconds: 60));
+      inResumedWindow = false;
+      expect(audioCalls, contains('resume'));
+      expect(writesAfterResume, greaterThan(0));
+
+      await openCommandBarAndTap(tester, AerKeys.commandBarDisconnect);
+      expect(audioCalls, contains('close'));
+      expect(find.byKey(AerKeys.connectionCenterPage), findsOneWidget);
       expectNoOverflowErrors(tester);
     });
   });

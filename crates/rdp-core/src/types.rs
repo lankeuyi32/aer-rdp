@@ -59,8 +59,7 @@ pub enum AudioMode {
 pub struct ConnectConfig {
     pub host: String,
     pub port: u16,
-    /// Requested desktop width. Clamped to `[200, 8192]` and aligned down to a multiple of 4
-    /// for `CS_CORE` compatibility.
+    /// Requested desktop width. Clamped to `[200, 8192]` for `CS_CORE` compatibility.
     pub width: u16,
     /// Requested desktop height. Clamped to `[200, 8192]`.
     pub height: u16,
@@ -108,11 +107,11 @@ impl ConnectConfig {
         Ok(())
     }
 
-    /// Returns `(aligned_width, clamped_height)` suitable for `CS_CORE` (`width` multiple of 4).
+    /// Returns `(clamped_width, clamped_height)` clamped to `[200, 8192]` for `CS_CORE`.
     pub fn aligned_dimensions(&self) -> (u16, u16) {
-        let w = (self.width.clamp(200, 8192)) & !3;
+        let w = self.width.clamp(200, 8192);
         let h = self.height.clamp(200, 8192);
-        (w.max(200), h.max(200))
+        (w, h)
     }
 }
 
@@ -235,4 +234,33 @@ pub fn normalize_sha256_pin(raw: &str) -> String {
         .filter(|c| c.is_ascii_hexdigit())
         .collect::<String>()
         .to_ascii_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn aligned_dimensions_preserves_odd_widths_and_clamps_bounds() {
+        let odd = ConnectConfig {
+            width: 853,
+            height: 480,
+            ..Default::default()
+        };
+        assert_eq!(odd.aligned_dimensions(), (853, 480));
+
+        let wxga = ConnectConfig {
+            width: 1366,
+            height: 768,
+            ..Default::default()
+        };
+        assert_eq!(wxga.aligned_dimensions(), (1366, 768));
+
+        let out_of_range = ConnectConfig {
+            width: 100,
+            height: 9000,
+            ..Default::default()
+        };
+        assert_eq!(out_of_range.aligned_dimensions(), (200, 8192));
+    }
 }

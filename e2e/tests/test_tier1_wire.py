@@ -790,7 +790,7 @@ class TestTier1FA10IpadStatic(WireE2ETestCase):
                             "--target",
                             "aarch64-apple-ios",
                             "-e",
-                            "normal",
+                            "normal,build",
                         ],
                         cwd=str(REPO_ROOT),
                         capture_output=True,

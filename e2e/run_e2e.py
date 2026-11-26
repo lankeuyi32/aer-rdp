@@ -39,7 +39,9 @@ from e2e.lib.flutter_runner import (  # noqa: E402
     run_flutter_integration_tests,
 )
 
-_FLUTTER_SUMMARY_RE = re.compile(r"\+(\d+)(?:\s+-(\d+))?\s*:")
+_FLUTTER_SUMMARY_RE = re.compile(
+    r"(?m)^\s*\d{2,}:\d{2}\s+\+(\d+)(?:\s+~(\d+))?(?:\s+-(\d+))?\s*:"
+)
 
 TIER_E2E_MODULES: dict[int, str] = {
     1: "e2e.tests.test_tier1_wire",
@@ -301,6 +303,7 @@ def main(argv: list[str] | None = None) -> int:
             "passed": 0,
             "failed": 0,
             "errors": 0,
+            "skipped": 0,
             "durationSec": 0.0,
             "ok": True,
             "failureDetails": [],
@@ -315,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
             tier_entry["passed"] += e2e_res["passed"]
             tier_entry["failed"] += e2e_res["failed"]
             tier_entry["errors"] += e2e_res["errors"]
+            tier_entry["skipped"] += e2e_res["skipped"]
             tier_entry["failureDetails"].extend(e2e_res["failureDetails"])
             if not e2e_res["ok"]:
                 tier_entry["ok"] = False
@@ -325,31 +329,65 @@ def main(argv: list[str] | None = None) -> int:
             id_locs: dict[str, str] = flutter_audit["id_locations"]  # type: ignore[assignment]
             fl_expected = sum(1 for fname in id_locs.values() if fname == dart_file.name)
             fl_res = run_flutter_integration_tests(files=[dart_file], device=args.flutter_device)
-            fl_passed = fl_expected if fl_res.returncode == 0 else 0
+            fl_passed = 0
+            fl_skipped = 0
             fl_failed = 0 if fl_res.returncode == 0 else max(1, fl_expected)
-            matches = _FLUTTER_SUMMARY_RE.findall(f"{fl_res.stdout}\n{fl_res.stderr}")
+            stdout_norm = fl_res.stdout.replace("\r\n", "\n").replace("\r", "\n")
+            stderr_norm = fl_res.stderr.replace("\r\n", "\n").replace("\r", "\n")
+            matches = _FLUTTER_SUMMARY_RE.findall(stdout_norm)
+            if not matches:
+                matches = _FLUTTER_SUMMARY_RE.findall(stderr_norm)
             if matches:
-                last_p, last_f = matches[-1]
+                last_p, _last_s, _last_f = matches[-1]
                 fl_passed = int(last_p)
-                fl_failed = int(last_f) if last_f else (0 if fl_res.returncode == 0 else 1)
-            fl_total = max(fl_expected, fl_passed + fl_failed) if fl_res.returncode == 0 else (fl_passed + fl_failed)
+                fl_skipped = max(int(s) if s else 0 for _, s, _ in matches)
+                fl_failed = max(int(f) if f else 0 for _, _, f in matches)
+                if fl_failed == 0 and fl_res.returncode != 0:
+                    fl_failed = 1
+            fl_counted = fl_passed + fl_skipped + fl_failed
+            fl_total = max(fl_expected, fl_counted) if fl_res.returncode == 0 else max(1, fl_counted)
+            fl_ok = (
+                fl_res.returncode == 0
+                and fl_failed == 0
+                and fl_skipped == 0
+                and fl_passed >= fl_expected
+                and fl_passed > 0
+            )
             tier_entry["testsRun"] += fl_total
             tier_entry["passed"] += fl_passed
             tier_entry["failed"] += fl_failed
+            tier_entry["skipped"] += fl_skipped
             tier_entry["flutter"] = {
                 "file": str(dart_file.relative_to(REPO_ROOT)),
+                "expectedTests": fl_expected,
                 "testsRun": fl_total,
                 "passed": fl_passed,
                 "failed": fl_failed,
+                "skipped": fl_skipped,
                 "returncode": fl_res.returncode,
                 "command": fl_res.command,
-                "ok": fl_res.returncode == 0,
+                "ok": fl_ok,
             }
-            if fl_res.returncode != 0:
+            if not fl_ok:
                 tier_entry["ok"] = False
+                reasons: list[str] = []
+                if fl_res.returncode != 0:
+                    reasons.append(f"returncode={fl_res.returncode}")
+                if fl_failed > 0:
+                    reasons.append(f"failed={fl_failed}")
+                if fl_skipped > 0:
+                    reasons.append(f"skipped={fl_skipped}")
+                if fl_passed < fl_expected:
+                    reasons.append(f"passed {fl_passed} < expected {fl_expected}")
+                elif fl_passed == 0:
+                    reasons.append("passed=0")
+                output_excerpt = f"{fl_res.stdout}\n{fl_res.stderr}".strip()
+                trace = f"Flutter integration test gate failed ({', '.join(reasons)})."
+                if output_excerpt:
+                    trace = f"{trace}\n{output_excerpt}"
                 tier_entry["failureDetails"].append({
                     "test": str(dart_file.relative_to(REPO_ROOT)),
-                    "trace": f"{fl_res.stdout}\n{fl_res.stderr}".strip(),
+                    "trace": trace,
                 })
 
         tier_entry["durationSec"] = round(time.monotonic() - tier_started, 3)
