@@ -2433,15 +2433,20 @@ name = "rdp-core"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "der 0.7.10",
  "ironrdp",
  "ironrdp-tls",
  "ironrdp-tokio",
+ "rdp-test-server",
  "rustls",
+ "serde",
+ "serde_json",
  "sha2",
  "thiserror",
  "tokio",
  "tokio-rustls",
  "tracing",
+ "x509-cert",
 ]
 
 [[package]]
@@ -2461,10 +2466,23 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "const-oid 0.9.6",
+ "der 0.7.10",
+ "httparse",
  "ironrdp",
+ "ironrdp-acceptor",
  "ironrdp-server",
+ "ironrdp-tokio",
+ "ring",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "spki 0.7.3",
  "tokio",
+ "tokio-rustls",
  "tracing",
+ "x509-cert",
 ]
 
 [[package]]

@@ -1,15 +1,22 @@
 use sha2::{Digest, Sha256};
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum CoreError {
-    #[error("host must not be empty")]
-    EmptyHost,
-    #[error("port must be non-zero")]
-    InvalidPort,
-    #[error("desktop dimensions must be non-zero ({width}x{height})")]
-    InvalidDimensions { width: u16, height: u16 },
-}
+pub mod audio;
+pub mod connector;
+pub mod framebuffer;
+pub mod input;
+pub mod rdpsnd;
+pub mod session;
+pub mod tls;
+pub mod types;
+
+pub use audio::{AudioJitterBuffer, AudioStreamFormat};
+pub use framebuffer::{DirtyRect, Framebuffer};
+pub use session::{SessionHandle, connect};
+pub use types::{
+    AudioMode, AudioReadStats, AudioSyncStats, AuthCredentials, CertInfo, CertTrustDecision,
+    ConnectConfig, CoreError, SecurityMode, SessionCommand, SessionEvent, SessionState,
+    normalize_sha256_pin,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EngineConfig {

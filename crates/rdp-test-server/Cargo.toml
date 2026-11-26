@@ -7,7 +7,20 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 bytes.workspace = true
-ironrdp = { version = "0.17.0", default-features = false, features = ["core", "pdu", "svc", "rdpsnd", "graphics", "input"] }
+const-oid.workspace = true
+der.workspace = true
+httparse.workspace = true
+ironrdp = { version = "0.17.0", default-features = false, features = ["core", "pdu", "connector", "svc", "rdpsnd", "graphics", "input"] }
+ironrdp-acceptor.workspace = true
 ironrdp-server.workspace = true
+ironrdp-tokio.workspace = true
+ring.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+spki.workspace = true
 tokio.workspace = true
+tokio-rustls.workspace = true
 tracing.workspace = true
+x509-cert.workspace = true
