@@ -1,0 +1,9 @@
+[
+  { "action": "wait_active", "timeoutMs": 5000 },
+  { "action": "pointer", "x": 100, "y": 200, "buttonMask": 1, "down": true, "wheelDelta": 0 },
+  { "action": "pointer", "x": 100, "y": 200, "buttonMask": 1, "down": false, "wheelDelta": 0 },
+  { "action": "scancode", "code": 30, "extended": false, "down": true },
+  { "action": "scancode", "code": 30, "extended": false, "down": false },
+  { "action": "unicode", "text": "你好é" },
+  { "action": "disconnect" }
+]

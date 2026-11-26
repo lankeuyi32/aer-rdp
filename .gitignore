@@ -39,3 +39,8 @@ ios/Flutter/Flutter.podspec
 *.iml
 .DS_Store
 Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+

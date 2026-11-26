@@ -31,35 +31,35 @@ struct CliArgs {
     out: Option<PathBuf>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ScriptAction {
     WaitActive {
-        #[serde(default = "default_timeout_ms")]
+        #[serde(default = "default_timeout_ms", alias = "timeoutMs")]
         timeout_ms: u64,
     },
     WaitFrames {
-        #[serde(default = "default_min_frames")]
+        #[serde(default = "default_min_frames", alias = "minFrames")]
         min_frames: u64,
-        #[serde(default = "default_timeout_ms")]
+        #[serde(default = "default_timeout_ms", alias = "timeoutMs")]
         timeout_ms: u64,
     },
     WaitAudioReady {
-        #[serde(default = "default_timeout_ms")]
+        #[serde(default = "default_timeout_ms", alias = "timeoutMs")]
         timeout_ms: u64,
-        #[serde(default = "default_min_queued_ms")]
+        #[serde(default = "default_min_queued_ms", alias = "minQueuedMs")]
         min_queued_ms: u32,
     },
     Pointer {
         x: u16,
         y: u16,
-        #[serde(default)]
+        #[serde(default, alias = "buttonMask")]
         button_mask: u8,
         #[serde(default)]
         down: bool,
-        #[serde(default)]
+        #[serde(default, alias = "wheelDelta")]
         wheel_delta: i16,
-        #[serde(default)]
+        #[serde(default, alias = "wheelDeltaH")]
         wheel_delta_h: i16,
     },
     Scancode {
@@ -69,10 +69,15 @@ enum ScriptAction {
         down: bool,
     },
     Unicode {
-        code_unit: u16,
-        down: bool,
+        #[serde(default, alias = "codeUnit")]
+        code_unit: Option<u16>,
+        #[serde(default)]
+        down: Option<bool>,
+        #[serde(default)]
+        text: Option<String>,
     },
     DrainAudio {
+        #[serde(alias = "durationMs")]
         ms: u64,
     },
     SetMute {
@@ -82,9 +87,67 @@ enum ScriptAction {
         volume: f32,
     },
     WaitMs {
+        #[serde(alias = "durationMs")]
         ms: u64,
     },
     Disconnect,
+}
+
+fn parse_script_json(txt: &str) -> Result<Vec<ScriptAction>, String> {
+    let root: serde_json::Value =
+        serde_json::from_str(txt).map_err(|e| format!("invalid JSON: {e}"))?;
+    let raw_actions = match root {
+        serde_json::Value::Array(arr) => arr,
+        serde_json::Value::Object(mut obj) => match obj.remove("actions") {
+            Some(serde_json::Value::Array(arr)) => arr,
+            _ => {
+                return Err(
+                    "expected a JSON array or an object with an \"actions\" array".to_owned(),
+                );
+            }
+        },
+        _ => {
+            return Err("expected a JSON array or an object with an \"actions\" array".to_owned());
+        }
+    };
+
+    let mut actions = Vec::with_capacity(raw_actions.len());
+    for (idx, item) in raw_actions.into_iter().enumerate() {
+        let mut map = match item {
+            serde_json::Value::Object(m) => m,
+            _ => return Err(format!("actions[{idx}] must be a JSON object")),
+        };
+        match (map.get("type").cloned(), map.remove("action")) {
+            (None, Some(action_val)) => {
+                map.insert("type".to_owned(), action_val);
+            }
+            (Some(type_val), Some(action_val)) if type_val != action_val => {
+                return Err(format!(
+                    "actions[{idx}] has conflicting 'type' and 'action' fields"
+                ));
+            }
+            (None, None) => {
+                return Err(format!(
+                    "actions[{idx}] missing field `action` or `type`"
+                ));
+            }
+            _ => {}
+        }
+        let parsed: ScriptAction = serde_json::from_value(serde_json::Value::Object(map))
+            .map_err(|e| format!("actions[{idx}]: {e}"))?;
+        if let ScriptAction::Unicode {
+            code_unit: None,
+            text: None,
+            ..
+        } = &parsed
+        {
+            return Err(format!(
+                "actions[{idx}]: unicode requires 'text' or 'code_unit'/'codeUnit'"
+            ));
+        }
+        actions.push(parsed);
+    }
+    Ok(actions)
 }
 
 fn default_timeout_ms() -> u64 {
@@ -208,7 +271,7 @@ async fn main() -> ExitCode {
 
     let actions: Vec<ScriptAction> = if let Some(path) = &args.script {
         match std::fs::read_to_string(path) {
-            Ok(txt) => match serde_json::from_str(&txt) {
+            Ok(txt) => match parse_script_json(&txt) {
                 Ok(parsed) => parsed,
                 Err(e) => {
                     eprintln!("failed parsing --script JSON: {e}");
@@ -424,9 +487,27 @@ async fn main() -> ExitCode {
                     report.errors.push(e.to_string());
                 }
             }
-            ScriptAction::Unicode { code_unit, down } => {
-                if let Err(e) = handle.send_unicode(code_unit, down) {
-                    report.errors.push(e.to_string());
+            ScriptAction::Unicode {
+                code_unit,
+                down,
+                text,
+            } => {
+                if let Some(txt) = text {
+                    for unit in txt.encode_utf16() {
+                        if let Err(e) = handle.send_unicode(unit, true) {
+                            report.errors.push(e.to_string());
+                            break;
+                        }
+                        if let Err(e) = handle.send_unicode(unit, false) {
+                            report.errors.push(e.to_string());
+                            break;
+                        }
+                    }
+                } else if let Some(unit) = code_unit {
+                    let is_down = down.unwrap_or(true);
+                    if let Err(e) = handle.send_unicode(unit, is_down) {
+                        report.errors.push(e.to_string());
+                    }
                 }
             }
             ScriptAction::DrainAudio { ms } => {
@@ -437,6 +518,9 @@ async fn main() -> ExitCode {
                     tokio::time::interval_at(tokio::time::Instant::now() + step_dur, step_dur);
                 tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
                 for _ in 0..steps {
+                    if is_disconnected {
+                        break;
+                    }
                     tick.tick().await;
                     drain_pending_events(
                         &mut event_rx,
@@ -447,6 +531,9 @@ async fn main() -> ExitCode {
                         &mut is_disconnected,
                         &mut audio_stream_opened,
                     );
+                    if is_disconnected {
+                        break;
+                    }
                     let (sample_rate, frame_bytes) = {
                         let jb = handle.audio_buffer();
                         let guard = jb.lock().unwrap();
@@ -464,7 +551,9 @@ async fn main() -> ExitCode {
                     report.audio_drift_ms = stats.drift_ms;
                     report.audio_drops = stats.drops;
                 }
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                if !is_disconnected {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
             }
             ScriptAction::SetMute { muted } => {
                 if let Err(e) = handle.set_audio_mute(muted) {
@@ -501,6 +590,33 @@ async fn main() -> ExitCode {
                 }
             }
             ScriptAction::Disconnect => {
+                if is_active && report.frames_received == 0 && !is_disconnected {
+                    let frame_deadline = tokio::time::Instant::now() + Duration::from_millis(1500);
+                    while report.frames_received == 0 && !is_disconnected {
+                        let now = tokio::time::Instant::now();
+                        if now >= frame_deadline {
+                            break;
+                        }
+                        match tokio::time::timeout(frame_deadline - now, event_rx.recv()).await {
+                            Ok(Some(ev)) => {
+                                process_event(
+                                    &ev,
+                                    &handle,
+                                    &args.trust_cert,
+                                    &mut report,
+                                    &mut is_active,
+                                    &mut is_disconnected,
+                                    &mut audio_stream_opened,
+                                );
+                            }
+                            Ok(None) => {
+                                is_disconnected = true;
+                                break;
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                }
                 let _ = handle.disconnect();
                 let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
                 while !is_disconnected && tokio::time::Instant::now() < deadline {
@@ -664,5 +780,104 @@ fn emit_report(report: &CliReport, out_path: Option<&PathBuf>) {
             let _ = std::fs::create_dir_all(parent);
         }
         let _ = std::fs::write(path, json);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_e2e_action_camelcase_and_unicode_text() {
+        let raw = r#"[
+            {"action": "wait_active", "timeoutMs": 3500},
+            {"action": "wait_frames", "minFrames": 2, "timeoutMs": 4000},
+            {"action": "wait_audio_ready", "minQueuedMs": 60, "timeoutMs": 4500},
+            {"action": "pointer", "x": 120, "y": 240, "buttonMask": 1, "down": true, "wheelDelta": -120, "wheelDeltaH": 30},
+            {"action": "scancode", "code": 30, "extended": true, "down": false},
+            {"action": "unicode", "text": "你好é"},
+            {"action": "unicode", "codeUnit": 65},
+            {"action": "drain_audio", "durationMs": 600},
+            {"action": "set_mute", "muted": true},
+            {"action": "set_volume", "volume": 0.5},
+            {"action": "wait_ms", "durationMs": 250},
+            {"action": "disconnect"}
+        ]"#;
+        let parsed = parse_script_json(raw).expect("valid e2e script");
+        assert_eq!(parsed.len(), 12);
+        assert_eq!(parsed[0], ScriptAction::WaitActive { timeout_ms: 3500 });
+        assert_eq!(
+            parsed[1],
+            ScriptAction::WaitFrames {
+                min_frames: 2,
+                timeout_ms: 4000
+            }
+        );
+        assert_eq!(
+            parsed[2],
+            ScriptAction::WaitAudioReady {
+                timeout_ms: 4500,
+                min_queued_ms: 60
+            }
+        );
+        assert_eq!(
+            parsed[3],
+            ScriptAction::Pointer {
+                x: 120,
+                y: 240,
+                button_mask: 1,
+                down: true,
+                wheel_delta: -120,
+                wheel_delta_h: 30,
+            }
+        );
+        assert_eq!(
+            parsed[5],
+            ScriptAction::Unicode {
+                code_unit: None,
+                down: None,
+                text: Some("你好é".to_owned()),
+            }
+        );
+        assert_eq!(
+            parsed[6],
+            ScriptAction::Unicode {
+                code_unit: Some(65),
+                down: None,
+                text: None,
+            }
+        );
+        assert_eq!(parsed[7], ScriptAction::DrainAudio { ms: 600 });
+        assert_eq!(parsed[10], ScriptAction::WaitMs { ms: 250 });
+        assert_eq!(parsed[11], ScriptAction::Disconnect);
+    }
+
+    #[test]
+    fn parses_actions_wrapper_object_and_legacy_type_snakecase() {
+        let raw = r#"{"actions": [
+            {"type": "wait_active", "timeout_ms": 5000},
+            {"type": "unicode", "code_unit": 65, "down": false},
+            {"type": "drain_audio", "ms": 300},
+            {"type": "disconnect"}
+        ]}"#;
+        let parsed = parse_script_json(raw).expect("valid wrapped script");
+        assert_eq!(parsed.len(), 4);
+        assert_eq!(parsed[0], ScriptAction::WaitActive { timeout_ms: 5000 });
+        assert_eq!(
+            parsed[1],
+            ScriptAction::Unicode {
+                code_unit: Some(65),
+                down: Some(false),
+                text: None,
+            }
+        );
+        assert_eq!(parsed[2], ScriptAction::DrainAudio { ms: 300 });
+        assert_eq!(parsed[3], ScriptAction::Disconnect);
+    }
+
+    #[test]
+    fn rejects_unicode_without_text_or_code_unit() {
+        let raw = r#"[{"action": "unicode"}]"#;
+        assert!(parse_script_json(raw).is_err());
     }
 }

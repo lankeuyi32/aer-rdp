@@ -1,0 +1,190 @@
+{
+  "cases": [
+    {
+      "name": "unsupported_version_2",
+      "payload": {
+        "version": 2,
+        "profiles": []
+      },
+      "expected_error_substring": "version"
+    },
+    {
+      "name": "missing_profiles_array",
+      "payload": {
+        "version": 1
+      },
+      "expected_error_substring": "profiles"
+    },
+    {
+      "name": "invalid_port_negative",
+      "payload": {
+        "version": 1,
+        "profiles": [
+          {
+            "id": "bad-port",
+            "name": "Bad Port",
+            "host": "127.0.0.1",
+            "port": -1,
+            "username": "aer",
+            "domain": "",
+            "authMode": "prompt",
+            "securityMode": "nla",
+            "displayConfig": {
+              "mode": "custom",
+              "width": 1280,
+              "height": 720,
+              "scale": 1.0,
+              "orientationLock": "auto"
+            },
+            "audioConfig": { "mode": "local" },
+            "inputConfig": {
+              "defaultMode": "directTouch",
+              "swapButtons": false,
+              "textInputMode": "scancode"
+            },
+            "favorite": false,
+            "lastConnectedAt": null
+          }
+        ]
+      },
+      "expected_error_substring": "port"
+    },
+    {
+      "name": "invalid_security_enum",
+      "payload": {
+        "version": 1,
+        "profiles": [
+          {
+            "id": "bad-sec",
+            "name": "Bad Sec",
+            "host": "127.0.0.1",
+            "port": 3389,
+            "username": "aer",
+            "domain": "",
+            "authMode": "prompt",
+            "securityMode": "rdp_legacy",
+            "displayConfig": {
+              "mode": "custom",
+              "width": 1280,
+              "height": 720,
+              "scale": 1.0,
+              "orientationLock": "auto"
+            },
+            "audioConfig": { "mode": "local" },
+            "inputConfig": {
+              "defaultMode": "directTouch",
+              "swapButtons": false,
+              "textInputMode": "scancode"
+            },
+            "favorite": false,
+            "lastConnectedAt": null
+          }
+        ]
+      },
+      "expected_error_substring": "securityMode"
+    },
+    {
+      "name": "invalid_audio_enum",
+      "payload": {
+        "version": 1,
+        "profiles": [
+          {
+            "id": "bad-audio",
+            "name": "Bad Audio",
+            "host": "127.0.0.1",
+            "port": 3389,
+            "username": "aer",
+            "domain": "",
+            "authMode": "prompt",
+            "securityMode": "nla",
+            "displayConfig": {
+              "mode": "custom",
+              "width": 1280,
+              "height": 720,
+              "scale": 1.0,
+              "orientationLock": "auto"
+            },
+            "audioConfig": { "mode": "surround" },
+            "inputConfig": {
+              "defaultMode": "directTouch",
+              "swapButtons": false,
+              "textInputMode": "scancode"
+            },
+            "favorite": false,
+            "lastConnectedAt": null
+          }
+        ]
+      },
+      "expected_error_substring": "audioConfig.mode"
+    },
+    {
+      "name": "missing_host_and_bad_scale",
+      "payload": {
+        "version": 1,
+        "profiles": [
+          {
+            "id": "bad-host",
+            "name": "Bad Host",
+            "host": "",
+            "port": 3389,
+            "username": "aer",
+            "domain": "",
+            "authMode": "prompt",
+            "securityMode": "nla",
+            "displayConfig": {
+              "mode": "custom",
+              "width": 0,
+              "height": 720,
+              "scale": 12.0,
+              "orientationLock": "auto"
+            },
+            "audioConfig": { "mode": "local" },
+            "inputConfig": {
+              "defaultMode": "directTouch",
+              "swapButtons": false,
+              "textInputMode": "scancode"
+            },
+            "favorite": false,
+            "lastConnectedAt": null
+          }
+        ]
+      },
+      "expected_error_substring": "host"
+    },
+    {
+      "name": "plaintext_password_leaked",
+      "payload": {
+        "version": 1,
+        "profiles": [
+          {
+            "id": "leaked-pass",
+            "name": "Leaked",
+            "host": "127.0.0.1",
+            "port": 3389,
+            "username": "aer",
+            "domain": "",
+            "password": "secret",
+            "authMode": "saved",
+            "securityMode": "nla",
+            "displayConfig": {
+              "mode": "custom",
+              "width": 1280,
+              "height": 720,
+              "scale": 1.0,
+              "orientationLock": "auto"
+            },
+            "audioConfig": { "mode": "local" },
+            "inputConfig": {
+              "defaultMode": "directTouch",
+              "swapButtons": false,
+              "textInputMode": "scancode"
+            },
+            "favorite": false,
+            "lastConnectedAt": null
+          }
+        ]
+      },
+      "expected_error_substring": "plaintext secret"
+    }
+  ]
+}

@@ -169,6 +169,7 @@ pub type ServerMetricsInner = MockMetrics;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum RecordedInput {
+    #[serde(rename_all = "camelCase")]
     Pointer {
         x: u16,
         y: u16,
@@ -177,12 +178,14 @@ pub enum RecordedInput {
         wheel_delta: i16,
         timestamp_ms: u64,
     },
+    #[serde(rename_all = "camelCase")]
     Scancode {
         code: u8,
         extended: bool,
         down: bool,
         timestamp_ms: u64,
     },
+    #[serde(rename_all = "camelCase")]
     Unicode {
         code_unit: u16,
         down: bool,
@@ -466,5 +469,42 @@ mod tests {
             default_platform_type(),
             ironrdp::pdu::rdp::capability_sets::MajorPlatformType::WINDOWS
         );
+    }
+
+    #[test]
+    fn recorded_input_serializes_fields_in_camel_case() {
+        let ptr = serde_json::to_value(RecordedInput::Pointer {
+            x: 300,
+            y: 220,
+            button_mask: 1,
+            action: "wheel".to_owned(),
+            wheel_delta: 120,
+            timestamp_ms: 42,
+        })
+        .unwrap();
+        assert_eq!(ptr["kind"], "pointer");
+        assert_eq!(ptr["buttonMask"], 1);
+        assert_eq!(ptr["wheelDelta"], 120);
+        assert_eq!(ptr["timestampMs"], 42);
+
+        let sc = serde_json::to_value(RecordedInput::Scancode {
+            code: 30,
+            extended: true,
+            down: true,
+            timestamp_ms: 43,
+        })
+        .unwrap();
+        assert_eq!(sc["kind"], "scancode");
+        assert_eq!(sc["timestampMs"], 43);
+
+        let uni = serde_json::to_value(RecordedInput::Unicode {
+            code_unit: 0x4F60,
+            down: true,
+            timestamp_ms: 44,
+        })
+        .unwrap();
+        assert_eq!(uni["kind"], "unicode");
+        assert_eq!(uni["codeUnit"], 0x4F60);
+        assert_eq!(uni["timestampMs"], 44);
     }
 }

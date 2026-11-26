@@ -11,6 +11,8 @@ where
         bind_addr: SocketAddr::from(([0, 0, 0, 0], 3389)),
         ..MockConfig::default()
     };
+    let mut explicit_width = false;
+    let mut explicit_height = false;
 
     while let Some(flag) = args.next() {
         let val = args
@@ -30,8 +32,14 @@ where
             "--user" => cfg.username = val,
             "--pass" => cfg.password = val,
             "--domain" => cfg.domain = val,
-            "--width" => cfg.desktop_width = val.parse().map_err(|e| format!("invalid --width: {e}"))?,
-            "--height" => cfg.desktop_height = val.parse().map_err(|e| format!("invalid --height: {e}"))?,
+            "--width" => {
+                cfg.desktop_width = val.parse().map_err(|e| format!("invalid --width: {e}"))?;
+                explicit_width = true;
+            }
+            "--height" => {
+                cfg.desktop_height = val.parse().map_err(|e| format!("invalid --height: {e}"))?;
+                explicit_height = true;
+            }
             "--audio-hz" => cfg.audio_hz = val.parse().map_err(|e| format!("invalid --audio-hz: {e}"))?,
             "--rdpsnd-version" => {
                 cfg.rdpsnd_version = val
@@ -46,6 +54,9 @@ where
             }
             other => return Err(format!("unknown argument {other}")),
         }
+    }
+    if !explicit_width && !explicit_height {
+        cfg.honor_client_desktop_size = true;
     }
     Ok(cfg)
 }
@@ -115,5 +126,15 @@ mod tests {
         assert_eq!(cfg.audio_hz, 880);
         assert_eq!(cfg.rdpsnd_version, 5);
         assert_eq!(cfg.control_http_addr.unwrap().port(), 13390);
+        assert!(!cfg.honor_client_desktop_size);
+    }
+
+    #[test]
+    fn cli_honors_client_desktop_size_when_width_and_height_omitted() {
+        let args = ["--bind", "127.0.0.1:13389", "--auth", "nla"]
+            .into_iter()
+            .map(str::to_owned);
+        let cfg = parse_cli_args(args).unwrap();
+        assert!(cfg.honor_client_desktop_size);
     }
 }

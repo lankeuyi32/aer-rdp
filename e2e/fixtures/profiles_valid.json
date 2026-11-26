@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "home-nla-audio",
+      "name": "Home PC (NLA + Audio)",
+      "host": "192.168.1.10",
+      "port": 3389,
+      "username": "aer",
+      "domain": "",
+      "authMode": "saved",
+      "securityMode": "nla",
+      "displayConfig": {
+        "mode": "custom",
+        "width": 1280,
+        "height": 720,
+        "scale": 1.5,
+        "orientationLock": "landscape"
+      },
+      "audioConfig": {
+        "mode": "local"
+      },
+      "inputConfig": {
+        "defaultMode": "directTouch",
+        "swapButtons": false,
+        "textInputMode": "scancode"
+      },
+      "favorite": true,
+      "lastConnectedAt": "2026-11-26T10:00:00Z"
+    },
+    {
+      "id": "lab-tls-noaudio",
+      "name": "Lab Server (TLS)",
+      "host": "10.0.2.2",
+      "port": 13389,
+      "username": "labuser",
+      "domain": "WORK",
+      "authMode": "prompt",
+      "securityMode": "tls",
+      "displayConfig": {
+        "mode": "matchDevice",
+        "width": 1920,
+        "height": 1080,
+        "scale": 1.0,
+        "orientationLock": "auto"
+      },
+      "audioConfig": {
+        "mode": "off"
+      },
+      "inputConfig": {
+        "defaultMode": "pointer",
+        "swapButtons": true,
+        "textInputMode": "unicode"
+      },
+      "favorite": false,
+      "lastConnectedAt": null
+    },
+    {
+      "id": "media-wave5-remote",
+      "name": "办公电脑 🖥️ (Main)",
+      "host": "workstation.local",
+      "port": 3389,
+      "username": "测试用户",
+      "domain": "CORP",
+      "authMode": "saved",
+      "securityMode": "auto",
+      "displayConfig": {
+        "mode": "custom",
+        "width": 3840,
+        "height": 2160,
+        "scale": 2.0,
+        "orientationLock": "portrait"
+      },
+      "audioConfig": {
+        "mode": "remote"
+      },
+      "inputConfig": {
+        "defaultMode": "pointer",
+        "swapButtons": false,
+        "textInputMode": "unicode"
+      },
+      "favorite": true,
+      "lastConnectedAt": "2026-11-26T11:30:00Z"
+    }
+  ]
+}

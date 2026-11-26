@@ -139,15 +139,18 @@ import pathlib
 import re
 
 sink_swift = pathlib.Path("ios/Runner/AudioEngineSink.swift").read_text(encoding="utf-8")
-m = re.search(r"func\s+stopPlaybackLocked\s*\([^)]*\).*?\{(.*?)\n\s*\}", sink_swift, re.S)
-if m:
-    body = m.group(1)
-    assert "playerNode?.stop()" not in body and "playerNode.stop()" not in body, (
-        "stopPlaybackLocked must not call playerNode.stop() while holding lock"
-    )
-    assert "engine?.pause()" not in body and "engine.pause()" not in body, (
-        "stopPlaybackLocked must not call engine.pause() while holding lock"
-    )
+m = re.search(r"func\s+prepareStopPlaybackLocked\s*\([^)]*\).*?\{(.*?)\n\s*\}", sink_swift, re.S)
+assert m is not None, "prepareStopPlaybackLocked not found in ios/Runner/AudioEngineSink.swift"
+body = m.group(1)
+assert "playerNode?.stop()" not in body and "playerNode.stop()" not in body, (
+    "prepareStopPlaybackLocked must not call playerNode.stop() while holding lock"
+)
+assert "engine?.pause()" not in body and "engine.pause()" not in body, (
+    "prepareStopPlaybackLocked must not call engine.pause() while holding lock"
+)
+assert "setActive(" not in body, (
+    "prepareStopPlaybackLocked must not call setActive() while holding lock"
+)
 print("Verified AudioEngineSink.swift lock-safe stop/pause and AppDelegate.swift MethodChannel cases.")
 PY
 
