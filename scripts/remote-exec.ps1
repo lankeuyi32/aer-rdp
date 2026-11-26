@@ -31,7 +31,7 @@ fi
 REMOTE_DIR_RAW=$remoteDirQuoted
 case "`$REMOTE_DIR_RAW" in
   "~") REMOTE_DIR="`$HOME" ;;
-  "~/"*) REMOTE_DIR="`$HOME/`${REMOTE_DIR_RAW#~/}" ;;
+  "~/"*) REMOTE_DIR="`$HOME/`${REMOTE_DIR_RAW:2}" ;;
   *) REMOTE_DIR="`$REMOTE_DIR_RAW" ;;
 esac
 cd "`$REMOTE_DIR"
