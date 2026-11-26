@@ -9,7 +9,8 @@ echo "=== [1/5] cargo test --workspace ==="
 cargo test --workspace
 
 echo "=== [2/5] iOS target readiness & static config check ==="
-rustup target list --installed | grep -qx "aarch64-apple-ios"
+INSTALLED_TARGETS="$(rustup target list --installed)"
+printf '%s\n' "$INSTALLED_TARGETS" | grep -Fxq "aarch64-apple-ios"
 if command -v xcrun >/dev/null 2>&1; then
   cargo check --target aarch64-apple-ios -p rdp-ffi
 else
@@ -81,15 +82,16 @@ with zipfile.ZipFile(apk_path, "r") as zf:
         if abi_so not in names:
             raise SystemExit(f"ERROR: missing {abi_so} in APK")
 
-    stale_armeabi = [n for n in names if n.startswith("lib/armeabi-v7a/")]
-    if stale_armeabi:
-        raise SystemExit(f"ERROR: unexpected armeabi-v7a libraries in APK: {stale_armeabi}")
+    stale_32bit = [n for n in names if n.startswith("lib/armeabi-v7a/") or n.startswith("lib/x86/")]
+    if stale_32bit:
+        raise SystemExit(f"ERROR: unexpected 32-bit ABI libraries in APK: {stale_32bit}")
 
 print("APK manifest, DEX MainActivity, and ABI parity verified.")
 PY
 
 if [ -n "${ANDROID_HOME:-}" ] && [ -x "$ANDROID_HOME/build-tools/35.0.0/aapt2" ]; then
-  "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK_PATH" | grep -q "launchable-activity: name='dev.aer.rdp.MainActivity'"
+  BADGING_OUTPUT="$("$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK_PATH")"
+  printf '%s\n' "$BADGING_OUTPUT" | grep -Fq "launchable-activity: name='dev.aer.rdp.MainActivity'"
 fi
 
 echo "=== M1 VERIFICATION PASSED ==="

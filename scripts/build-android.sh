@@ -5,6 +5,11 @@ if [ -f "$HOME/.aer-rdp-env.sh" ]; then
   . "$HOME/.aer-rdp-env.sh"
 fi
 
+if [ $# -gt 1 ]; then
+  echo "Usage: $0 [--debug|--release]" >&2
+  exit 1
+fi
+
 MODE="debug"
 if [ "${1:-}" = "--release" ]; then
   MODE="release"
