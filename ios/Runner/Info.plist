@@ -57,6 +57,8 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>aer-rdp requires local network access to connect to remote desktop hosts on your LAN.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

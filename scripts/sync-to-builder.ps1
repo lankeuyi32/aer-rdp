@@ -119,7 +119,7 @@ find . \
   -depth -type d -empty -delete 2>/dev/null || true
 
 tar -xzf "`$REMOTE_ARCHIVE" -C "`$REMOTE_DIR"
-for f in scripts/*.sh; do
+for f in scripts/*.sh ios/Scripts/*.sh; do
   [ -f "`$f" ] || continue
   sed -i 's/\r`$//' "`$f"
   chmod +x "`$f"

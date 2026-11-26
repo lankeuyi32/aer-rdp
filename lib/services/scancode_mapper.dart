@@ -206,7 +206,17 @@ abstract final class ScancodeMapper {
     PhysicalKeyboardKey.metaRight: const ScancodeSpec(0x5C, extended: true),
   };
 
-  static ScancodeSpec? mapKeyEvent(KeyEvent event) {
+  static ScancodeSpec? mapKeyEvent(
+    KeyEvent event, {
+    bool mapCommandToCtrl = false,
+  }) {
+    if (mapCommandToCtrl &&
+        (event.logicalKey == LogicalKeyboardKey.metaLeft ||
+            event.logicalKey == LogicalKeyboardKey.metaRight)) {
+      return event.logicalKey == LogicalKeyboardKey.metaRight
+          ? const ScancodeSpec(0x1D, extended: true)
+          : const ScancodeSpec(0x1D);
+    }
     return _logicalMap[event.logicalKey] ?? _physicalMap[event.physicalKey];
   }
 

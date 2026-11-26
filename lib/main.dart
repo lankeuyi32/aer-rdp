@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:aer_rdp/src/rust/api.dart';
 import 'package:aer_rdp/src/rust/frb_generated.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'models/connection_profile.dart';
@@ -19,7 +21,11 @@ import 'ui/session/session_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await RustLib.init();
+  await RustLib.init(
+    externalLibrary: (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+        ? ExternalLibrary.process(iKnowHowToUseIt: true)
+        : null,
+  );
   final summary = getEngineSummary();
   final status =
       '${summary.name} v${summary.version} • ${summary.tlsProvider} • rdpsnd=${summary.supportsRdpsnd}';

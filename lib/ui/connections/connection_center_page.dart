@@ -369,7 +369,15 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
     final isPinned = widget.certTrustStore
             .getPinnedFingerprint(selected.host, selected.port) !=
         null;
-    return Padding(
+    final String userSummary = selected.username.isEmpty
+        ? '(prompt)'
+        : selected.domain.isEmpty
+            ? selected.username
+            : '${selected.domain}\\${selected.username}';
+    final String displaySummary = selected.displayConfig.mode == DisplayMode.custom
+        ? '${selected.displayConfig.mode.label} (${selected.displayConfig.width}x${selected.displayConfig.height} @ ${selected.displayConfig.scale}x)'
+        : '${selected.displayConfig.mode.label} (${selected.displayConfig.scale}x)';
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,10 +387,17 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
+          Text('Profile: ${selected.name}'),
           Text('Endpoint: ${selected.host}:${selected.port}'),
+          Text('User: $userSummary'),
           Text('Security: ${selected.securityMode.label}'),
+          Text('Display: $displaySummary'),
+          Text('Orientation: ${selected.displayConfig.orientationLock.label}'),
           Text('Audio: ${selected.audioConfig.mode.label}'),
-          Text('Input: ${selected.inputConfig.defaultMode.label}'),
+          Text(
+            'Input: ${selected.inputConfig.defaultMode.label}'
+            '${selected.inputConfig.swapButtons ? " (swapped)" : ""}',
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
@@ -448,19 +463,22 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
         tooltip: 'Add Profile',
         child: const Icon(Icons.add),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth >= 720) {
-            return Row(
-              children: [
-                Expanded(flex: 5, child: _buildListPane(filtered)),
-                const VerticalDivider(width: 1),
-                Expanded(flex: 6, child: _buildDetailPane(selected)),
-              ],
-            );
-          }
-          return _buildListPane(filtered);
-        },
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 600) {
+              return Row(
+                children: [
+                  Expanded(flex: 5, child: _buildListPane(filtered)),
+                  const VerticalDivider(width: 1),
+                  Expanded(flex: 6, child: _buildDetailPane(selected)),
+                ],
+              );
+            }
+            return _buildListPane(filtered);
+          },
+        ),
       ),
     );
   }

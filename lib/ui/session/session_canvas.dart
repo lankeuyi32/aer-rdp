@@ -20,6 +20,7 @@ class SessionCanvas extends StatefulWidget {
     required this.swapButtons,
     this.cursorState,
     this.frameRevision = 0,
+    this.onPointerDownFocus,
   });
 
   final RdpSessionController controller;
@@ -28,6 +29,7 @@ class SessionCanvas extends StatefulWidget {
   final bool swapButtons;
   final CursorState? cursorState;
   final int frameRevision;
+  final VoidCallback? onPointerDownFocus;
 
   @override
   State<SessionCanvas> createState() => _SessionCanvasState();
@@ -59,6 +61,10 @@ class _SessionCanvasState extends State<SessionCanvas> {
   Offset? _lastTwoFingerFocal;
   double _pinchBaseZoom = 1.0;
   double _pinchStartDistance = 0.0;
+  double _trackpadBaseZoom = 1.0;
+  bool _trackpadPinching = false;
+  double _trackpadScrollRemainderV = 0.0;
+  double _trackpadScrollRemainderH = 0.0;
 
   @override
   void initState() {
@@ -224,6 +230,7 @@ class _SessionCanvasState extends State<SessionCanvas> {
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    widget.onPointerDownFocus?.call();
     if (event.kind == PointerDeviceKind.touch) {
       _activeTouches[event.pointer] = event.localPosition;
       if (_activeTouches.length == 1) {
@@ -607,6 +614,49 @@ class _SessionCanvasState extends State<SessionCanvas> {
               Offset(_virtualCursorX, _virtualCursorY);
       final int wheelV = (-event.scrollDelta.dy).round().clamp(-256, 255);
       final int wheelH = event.scrollDelta.dx.round().clamp(-256, 255);
+      if (wheelV != 0 || wheelH != 0) {
+        unawaited(
+          widget.controller.sendPointerEvent(
+            x: remote.dx.round(),
+            y: remote.dy.round(),
+            buttonMask: RdpPointerButtons.none,
+            down: false,
+            wheelDeltaV: wheelV,
+            wheelDeltaH: wheelH,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handlePanZoomStart(PointerPanZoomStartEvent event) {
+    _trackpadBaseZoom = widget.viewportController.zoom;
+    _trackpadPinching = false;
+    _trackpadScrollRemainderV = 0.0;
+    _trackpadScrollRemainderH = 0.0;
+  }
+
+  void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
+    if ((event.scale - 1.0).abs() > 0.02) {
+      _trackpadPinching = true;
+    }
+    if (_trackpadPinching) {
+      widget.viewportController.setZoom(
+        _trackpadBaseZoom * event.scale,
+        focalPoint: event.localPosition,
+      );
+      return;
+    }
+    final remote =
+        widget.viewportController.viewportToRemote(event.localPosition) ??
+            Offset(_virtualCursorX, _virtualCursorY);
+    _trackpadScrollRemainderV += -event.localPanDelta.dy;
+    _trackpadScrollRemainderH += event.localPanDelta.dx;
+    final int wheelV = _trackpadScrollRemainderV.truncate().clamp(-256, 255);
+    final int wheelH = _trackpadScrollRemainderH.truncate().clamp(-256, 255);
+    if (wheelV != 0 || wheelH != 0) {
+      _trackpadScrollRemainderV -= wheelV;
+      _trackpadScrollRemainderH -= wheelH;
       unawaited(
         widget.controller.sendPointerEvent(
           x: remote.dx.round(),
@@ -620,28 +670,10 @@ class _SessionCanvasState extends State<SessionCanvas> {
     }
   }
 
-  void _handlePanZoomUpdate(PointerPanZoomUpdateEvent event) {
-    if (event.scale != 1.0) {
-      widget.viewportController.setZoom(
-        widget.viewportController.zoom * event.scale,
-        focalPoint: event.localPosition,
-      );
-    }
-    final remote =
-        widget.viewportController.viewportToRemote(event.localPosition) ??
-            Offset(_virtualCursorX, _virtualCursorY);
-    final int wheelV = (-event.localPanDelta.dy).round().clamp(-256, 255);
-    if (wheelV != 0) {
-      unawaited(
-        widget.controller.sendPointerEvent(
-          x: remote.dx.round(),
-          y: remote.dy.round(),
-          buttonMask: RdpPointerButtons.none,
-          down: false,
-          wheelDeltaV: wheelV,
-        ),
-      );
-    }
+  void _handlePanZoomEnd(PointerPanZoomEndEvent event) {
+    _trackpadPinching = false;
+    _trackpadScrollRemainderV = 0.0;
+    _trackpadScrollRemainderH = 0.0;
   }
 
   @override
@@ -657,24 +689,29 @@ class _SessionCanvasState extends State<SessionCanvas> {
 
         final displayRect = widget.viewportController.computeDisplayRect(size);
 
-        return Listener(
-          key: AerKeys.sessionCanvas,
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: _handlePointerDown,
-          onPointerMove: _handlePointerMove,
-          onPointerUp: _handlePointerUp,
-          onPointerCancel: _handlePointerCancel,
-          onPointerHover: _handlePointerHover,
-          onPointerSignal: _handlePointerSignal,
-          onPointerPanZoomUpdate: _handlePanZoomUpdate,
-          child: SizedBox.expand(
-            child: CustomPaint(
-              painter: _SessionPainter(
-                image: _frameImage,
-                displayRect: displayRect,
-                cursor: widget.cursorState,
-                remoteWidth: widget.viewportController.remoteWidth,
-                remoteHeight: widget.viewportController.remoteHeight,
+        return MouseRegion(
+          cursor: SystemMouseCursors.basic,
+          child: Listener(
+            key: AerKeys.sessionCanvas,
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: _handlePointerDown,
+            onPointerMove: _handlePointerMove,
+            onPointerUp: _handlePointerUp,
+            onPointerCancel: _handlePointerCancel,
+            onPointerHover: _handlePointerHover,
+            onPointerSignal: _handlePointerSignal,
+            onPointerPanZoomStart: _handlePanZoomStart,
+            onPointerPanZoomUpdate: _handlePanZoomUpdate,
+            onPointerPanZoomEnd: _handlePanZoomEnd,
+            child: SizedBox.expand(
+              child: CustomPaint(
+                painter: _SessionPainter(
+                  image: _frameImage,
+                  displayRect: displayRect,
+                  cursor: widget.cursorState,
+                  remoteWidth: widget.viewportController.remoteWidth,
+                  remoteHeight: widget.viewportController.remoteHeight,
+                ),
               ),
             ),
           ),

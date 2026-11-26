@@ -267,267 +267,307 @@ class _ProfileFormDialogState extends State<ProfileFormDialog> {
       content: SizedBox(
         width: 480,
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_errorMessage != null) ...[
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 13,
-                  ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bool compact = constraints.maxWidth < 360;
+              final nameField = TextField(
+                key: AerKeys.profileFormName,
+                controller: _nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  isDense: true,
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 6),
-              ],
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      key: AerKeys.profileFormName,
-                      controller: _nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      key: AerKeys.profileFormHost,
-                      controller: _hostCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Host',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 1,
-                    child: TextField(
-                      key: AerKeys.profileFormPort,
-                      controller: _portCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Port',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: AerKeys.profileFormUser,
-                      controller: _userCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      key: AerKeys.profileFormDomain,
-                      controller: _domainCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Domain',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      key: AerKeys.profileFormPassword,
-                      controller: _passwordCtrl,
-                      obscureText: true,
-                      onChanged: (_) => _passwordTouched = true,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        hintText: (isEdit &&
-                                widget.existing?.authMode == AuthMode.saved &&
-                                !_passwordLoaded)
-                            ? 'Saved'
-                            : null,
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  _buildChipGroup<SecurityMode>(
-                    fieldKey: AerKeys.profileFormSecurity,
-                    label: 'Security',
-                    values: SecurityMode.values,
-                    selected: _securityMode,
-                    labelOf: (m) => m.label,
-                    onChanged: (v) => setState(() => _securityMode = v),
-                  ),
-                  _buildChipGroup<AudioMode>(
-                    fieldKey: AerKeys.profileFormAudio,
-                    label: 'Audio',
-                    values: AudioMode.values,
-                    selected: _audioMode,
-                    labelOf: (m) => m.label,
-                    onChanged: (v) => setState(() => _audioMode = v),
-                  ),
-                  _buildChipGroup<InputMode>(
-                    fieldKey: AerKeys.profileFormInputMode,
-                    label: 'Input Mode',
-                    values: InputMode.values,
-                    selected: _inputMode,
-                    labelOf: (m) => m.label,
-                    onChanged: (v) => setState(() => _inputMode = v),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ...DisplayMode.values.map((mode) {
-                    return ChoiceChip(
-                      label: Text(mode.label),
-                      selected: _displayMode == mode,
-                      visualDensity: VisualDensity.compact,
-                      onSelected: (_) => setState(() => _displayMode = mode),
-                    );
-                  }),
-                  FilterChip(
-                    label: const Text('Swap Buttons'),
-                    selected: _swapButtons,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (v) => setState(() => _swapButtons = v),
-                  ),
-                ],
-              ),
-              if (_displayMode == DisplayMode.custom) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _widthCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Width',
-                          isDense: true,
-                          border: OutlineInputBorder(),
+              );
+              final hostField = TextField(
+                key: AerKeys.profileFormHost,
+                controller: _hostCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Host',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final portField = TextField(
+                key: AerKeys.profileFormPort,
+                controller: _portCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Port',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final userField = TextField(
+                key: AerKeys.profileFormUser,
+                controller: _userCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final domainField = TextField(
+                key: AerKeys.profileFormDomain,
+                controller: _domainCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Domain',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final passwordField = TextField(
+                key: AerKeys.profileFormPassword,
+                controller: _passwordCtrl,
+                obscureText: true,
+                onChanged: (_) => _passwordTouched = true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  hintText: (isEdit &&
+                          widget.existing?.authMode == AuthMode.saved &&
+                          !_passwordLoaded)
+                      ? 'Saved'
+                      : null,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+              );
+              final widthField = TextField(
+                controller: _widthCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Width',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final heightField = TextField(
+                controller: _heightCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Height',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final scaleField = TextField(
+                controller: _scaleCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Scale',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              );
+              final orientationDropdown =
+                  DropdownButtonFormField<OrientationLock>(
+                initialValue: _orientationLock,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Orientation',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items: OrientationLock.values
+                    .map(
+                      (o) => DropdownMenuItem<OrientationLock>(
+                        value: o,
+                        child: Text(
+                          o.label,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _heightCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Height',
-                          isDense: true,
-                          border: OutlineInputBorder(),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _orientationLock = v);
+                },
+              );
+              final keyboardDropdown = DropdownButtonFormField<TextInputMode>(
+                initialValue: _textInputMode,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Keyboard',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items: TextInputMode.values
+                    .map(
+                      (t) => DropdownMenuItem<TextInputMode>(
+                        value: t,
+                        child: Text(
+                          t.label,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _textInputMode = v);
+                },
+              );
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_errorMessage != null) ...[
+                    Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 13,
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _scaleCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Scale',
-                          isDense: true,
-                          border: OutlineInputBorder(),
-                        ),
+                    const SizedBox(height: 6),
+                  ],
+                  if (compact) ...[
+                    nameField,
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(flex: 2, child: hostField),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 1, child: portField),
+                      ],
+                    ),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(flex: 2, child: nameField),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: hostField),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 1, child: portField),
+                      ],
+                    ),
+                  const SizedBox(height: 8),
+                  if (compact) ...[
+                    userField,
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: domainField),
+                        const SizedBox(width: 8),
+                        Expanded(child: passwordField),
+                      ],
+                    ),
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: userField),
+                        const SizedBox(width: 8),
+                        Expanded(child: domainField),
+                        const SizedBox(width: 8),
+                        Expanded(child: passwordField),
+                      ],
+                    ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      _buildChipGroup<SecurityMode>(
+                        fieldKey: AerKeys.profileFormSecurity,
+                        label: 'Security',
+                        values: SecurityMode.values,
+                        selected: _securityMode,
+                        labelOf: (m) => m.label,
+                        onChanged: (v) => setState(() => _securityMode = v),
+                      ),
+                      _buildChipGroup<AudioMode>(
+                        fieldKey: AerKeys.profileFormAudio,
+                        label: 'Audio',
+                        values: AudioMode.values,
+                        selected: _audioMode,
+                        labelOf: (m) => m.label,
+                        onChanged: (v) => setState(() => _audioMode = v),
+                      ),
+                      _buildChipGroup<InputMode>(
+                        fieldKey: AerKeys.profileFormInputMode,
+                        label: 'Input Mode',
+                        values: InputMode.values,
+                        selected: _inputMode,
+                        labelOf: (m) => m.label,
+                        onChanged: (v) => setState(() => _inputMode = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ...DisplayMode.values.map((mode) {
+                        return ChoiceChip(
+                          label: Text(mode.label),
+                          selected: _displayMode == mode,
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) =>
+                              setState(() => _displayMode = mode),
+                        );
+                      }),
+                      FilterChip(
+                        label: const Text('Swap Buttons'),
+                        selected: _swapButtons,
+                        visualDensity: VisualDensity.compact,
+                        onSelected: (v) => setState(() => _swapButtons = v),
+                      ),
+                    ],
+                  ),
+                  if (_displayMode == DisplayMode.custom) ...[
+                    const SizedBox(height: 8),
+                    if (compact) ...[
+                      Row(
+                        children: [
+                          Expanded(child: widthField),
+                          const SizedBox(width: 8),
+                          Expanded(child: heightField),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      scaleField,
+                    ] else
+                      Row(
+                        children: [
+                          Expanded(child: widthField),
+                          const SizedBox(width: 8),
+                          Expanded(child: heightField),
+                          const SizedBox(width: 8),
+                          Expanded(child: scaleField),
+                        ],
+                      ),
+                  ],
+                  const SizedBox(height: 8),
+                  if (compact) ...[
+                    orientationDropdown,
+                    const SizedBox(height: 8),
+                    keyboardDropdown,
+                  ] else
+                    Row(
+                      children: [
+                        Expanded(child: orientationDropdown),
+                        const SizedBox(width: 8),
+                        Expanded(child: keyboardDropdown),
+                      ],
+                    ),
+                  if (isEdit && _hasPinnedCert) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _clearCertTrust,
+                        icon: const Icon(Icons.gpp_maybe_outlined),
+                        label: const Text('Clear Trust'),
                       ),
                     ),
                   ],
-                ),
-              ],
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<OrientationLock>(
-                      initialValue: _orientationLock,
-                      decoration: const InputDecoration(
-                        labelText: 'Orientation',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      items: OrientationLock.values
-                          .map(
-                            (o) => DropdownMenuItem<OrientationLock>(
-                              value: o,
-                              child: Text(o.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _orientationLock = v);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: DropdownButtonFormField<TextInputMode>(
-                      initialValue: _textInputMode,
-                      decoration: const InputDecoration(
-                        labelText: 'Keyboard',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      items: TextInputMode.values
-                          .map(
-                            (t) => DropdownMenuItem<TextInputMode>(
-                              value: t,
-                              child: Text(t.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _textInputMode = v);
-                      },
-                    ),
-                  ),
                 ],
-              ),
-              if (isEdit && _hasPinnedCert) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
-                    onPressed: _clearCertTrust,
-                    icon: const Icon(Icons.gpp_maybe_outlined),
-                    label: const Text('Clear Trust'),
-                  ),
-                ),
-              ],
-            ],
+              );
+            },
           ),
         ),
       ),

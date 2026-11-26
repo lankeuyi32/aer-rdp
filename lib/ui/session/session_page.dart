@@ -581,6 +581,11 @@ class _SessionPageState extends State<SessionPage>
       body: Focus(
         focusNode: _focusNode,
         autofocus: true,
+        onFocusChange: (hasFocus) {
+          if (!hasFocus) {
+            unawaited(_releaseAllKeysAndModifiers());
+          }
+        },
         onKeyEvent: _handleKeyEvent,
         child: SafeArea(
           child: Column(
@@ -597,6 +602,11 @@ class _SessionPageState extends State<SessionPage>
                           swapButtons: widget.profile.inputConfig.swapButtons,
                           cursorState: _cursorState,
                           frameRevision: _frameRevision,
+                          onPointerDownFocus: () {
+                            if (!_focusNode.hasFocus) {
+                              _focusNode.requestFocus();
+                            }
+                          },
                         ),
                         if (_sessionState.phase == SessionPhase.connecting ||
                             _sessionState.phase == SessionPhase.reactivating)
