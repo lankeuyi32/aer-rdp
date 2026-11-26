@@ -24,6 +24,7 @@ class SessionPage extends StatefulWidget {
     required this.controller,
     required this.certTrustStore,
     required this.onEnded,
+    this.onDisconnected,
     this.initialAudioFormat,
     this.initialWidth,
     this.initialHeight,
@@ -35,6 +36,7 @@ class SessionPage extends StatefulWidget {
   final RdpSessionController controller;
   final CertTrustStore certTrustStore;
   final VoidCallback onEnded;
+  final void Function(String reason, bool clean)? onDisconnected;
   final AudioStreamOpenedEvent? initialAudioFormat;
   final int? initialWidth;
   final int? initialHeight;
@@ -169,7 +171,7 @@ class _SessionPageState extends State<SessionPage>
     }
   }
 
-  void _finishSession() {
+  void _finishSession({String reason = '', bool clean = true}) {
     if (_endedCalled) return;
     _endedCalled = true;
     unawaited(
@@ -179,7 +181,11 @@ class _SessionPageState extends State<SessionPage>
     unawaited(_releaseAllKeysAndModifiers());
     unawaited(_audioSink.stop());
     if (mounted) {
-      widget.onEnded();
+      if (widget.onDisconnected != null) {
+        widget.onDisconnected!(reason, clean);
+      } else {
+        widget.onEnded();
+      }
     }
   }
 
@@ -204,7 +210,10 @@ class _SessionPageState extends State<SessionPage>
             _viewportController.setRemoteSize(state.width, state.height);
             setState(() => _frameRevision++);
           case SessionPhase.disconnected:
-            _finishSession();
+            _finishSession(
+              reason: state.disconnectReason,
+              clean: state.cleanDisconnect,
+            );
           case SessionPhase.connecting:
           case SessionPhase.reactivating:
             break;

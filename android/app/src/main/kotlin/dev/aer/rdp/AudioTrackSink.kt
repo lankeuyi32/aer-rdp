@@ -17,6 +17,7 @@ class AudioTrackSink(private val context: Context) {
     private var hasAudioFocus: Boolean = false
     private var isPaused: Boolean = false
     private var isFocusLost: Boolean = false
+    private var isTrackDead: Boolean = false
     private var lastHeadPosUnsigned: Long = 0L
     private var maxBufferBytes: Int = 0
     private var pendingTail: ByteArray? = null
@@ -29,7 +30,7 @@ class AudioTrackSink(private val context: Context) {
                     hasAudioFocus = true
                     track?.let { t ->
                         t.setVolume(1.0f)
-                        if (!isPaused && t.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                        if (!isPaused && !isTrackDead && t.playState != AudioTrack.PLAYSTATE_PLAYING) {
                             t.play()
                             lastHeadPosUnsigned = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
                         }
@@ -110,6 +111,7 @@ class AudioTrackSink(private val context: Context) {
         requestFocus(attributes)
         isPaused = false
         isFocusLost = false
+        isTrackDead = false
         lastHeadPosUnsigned = 0L
         pendingTail = null
         track = createdTrack
@@ -131,7 +133,7 @@ class AudioTrackSink(private val context: Context) {
         )
 
         val deltaFrames = consumeHeadDelta(t)
-        val currentlyPaused = isPaused || isFocusLost
+        val currentlyPaused = isPaused || isFocusLost || isTrackDead
         if (currentlyPaused) {
             pendingTail = null
             return mapOf(
@@ -154,7 +156,14 @@ class AudioTrackSink(private val context: Context) {
 
         if (payload.isNotEmpty()) {
             val written = t.write(payload, 0, payload.size, AudioTrack.WRITE_NON_BLOCKING)
-            if (written > 0 && written < payload.size) {
+            if (written < 0) {
+                isTrackDead = true
+                pauseTrackInternal()
+                return mapOf(
+                    "framesPlayedDelta" to deltaFrames,
+                    "paused" to true
+                )
+            } else if (written > 0 && written < payload.size) {
                 val remaining = payload.size - written
                 pendingTail = if (remaining <= maxBufferBytes) {
                     payload.copyOfRange(written, payload.size)
@@ -183,12 +192,16 @@ class AudioTrackSink(private val context: Context) {
             "paused" to true
         )
         val deltaFrames = consumeHeadDelta(t)
-        val currentlyPaused = isPaused || isFocusLost
+        var currentlyPaused = isPaused || isFocusLost || isTrackDead
         if (!currentlyPaused) {
             val tail = pendingTail
             if (tail != null && tail.isNotEmpty()) {
                 val written = t.write(tail, 0, tail.size, AudioTrack.WRITE_NON_BLOCKING)
-                if (written > 0 && written < tail.size) {
+                if (written < 0) {
+                    isTrackDead = true
+                    pauseTrackInternal()
+                    currentlyPaused = true
+                } else if (written > 0 && written < tail.size) {
                     val remaining = tail.size - written
                     pendingTail = if (remaining <= maxBufferBytes) {
                         tail.copyOfRange(written, tail.size)
@@ -196,8 +209,6 @@ class AudioTrackSink(private val context: Context) {
                         null
                     }
                 } else if (written == tail.size) {
-                    pendingTail = null
-                } else if (written < 0) {
                     pendingTail = null
                 }
             }
@@ -218,7 +229,7 @@ class AudioTrackSink(private val context: Context) {
     fun resume() {
         isPaused = false
         val t = track ?: return
-        if (!isFocusLost) {
+        if (!isFocusLost && !isTrackDead) {
             if (!hasAudioFocus) {
                 val attrs = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -252,6 +263,7 @@ class AudioTrackSink(private val context: Context) {
         lastHeadPosUnsigned = 0L
         isPaused = false
         isFocusLost = false
+        isTrackDead = false
         track?.let { t ->
             try {
                 if (t.playState == AudioTrack.PLAYSTATE_PLAYING) {
@@ -270,10 +282,14 @@ class AudioTrackSink(private val context: Context) {
     }
 
     private fun consumeHeadDelta(t: AudioTrack): Int {
-        val rawHead = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
-        val delta = (rawHead - lastHeadPosUnsigned) and 0xFFFFFFFFL
-        lastHeadPosUnsigned = rawHead
-        return delta.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        return try {
+            val rawHead = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+            val delta = (rawHead - lastHeadPosUnsigned) and 0xFFFFFFFFL
+            lastHeadPosUnsigned = rawHead
+            delta.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        } catch (_: Throwable) {
+            0
+        }
     }
 
     private fun pauseTrackInternal() {

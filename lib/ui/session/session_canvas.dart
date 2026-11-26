@@ -57,6 +57,8 @@ class _SessionCanvasState extends State<SessionCanvas> {
   bool _twoFingerGestureActive = false;
   bool _twoFingerMoved = false;
   bool _isTwoFingerPinch = false;
+  final Map<int, Offset> _twoFingerStartPositions = <int, Offset>{};
+  int _twoFingerPinchConfirmCount = 0;
   Offset _twoFingerFocalDown = Offset.zero;
   Offset? _lastTwoFingerFocal;
   double _pinchBaseZoom = 1.0;
@@ -237,6 +239,8 @@ class _SessionCanvasState extends State<SessionCanvas> {
         _twoFingerGestureActive = false;
         _twoFingerMoved = false;
         _isTwoFingerPinch = false;
+        _twoFingerStartPositions.clear();
+        _twoFingerPinchConfirmCount = 0;
         _lastTwoFingerFocal = null;
         _pointerModeMoved = false;
         _pointerDownViewportPos = event.localPosition;
@@ -308,6 +312,10 @@ class _SessionCanvasState extends State<SessionCanvas> {
         _twoFingerGestureActive = true;
         _twoFingerMoved = false;
         _isTwoFingerPinch = false;
+        _twoFingerStartPositions
+          ..clear()
+          ..addAll(_activeTouches);
+        _twoFingerPinchConfirmCount = 0;
         final pts = _activeTouches.values.toList(growable: false);
         _pinchStartDistance = (pts[0] - pts[1]).distance.clamp(1.0, 10000.0);
         _pinchBaseZoom = widget.viewportController.zoom;
@@ -341,16 +349,37 @@ class _SessionCanvasState extends State<SessionCanvas> {
     if (event.kind == PointerDeviceKind.touch) {
       _activeTouches[event.pointer] = event.localPosition;
       if (_activeTouches.length >= 2) {
-        final pts = _activeTouches.values.toList(growable: false);
-        final double dist = (pts[0] - pts[1]).distance.clamp(1.0, 10000.0);
-        final Offset focal = (pts[0] + pts[1]) / 2.0;
+        final entries = _activeTouches.entries.take(2).toList(growable: false);
+        final int id0 = entries[0].key;
+        final int id1 = entries[1].key;
+        final Offset p0 = entries[0].value;
+        final Offset p1 = entries[1].value;
+        final double dist = (p0 - p1).distance.clamp(1.0, 10000.0);
+        final Offset focal = (p0 + p1) / 2.0;
         final double distDelta = (dist - _pinchStartDistance).abs();
         final double focalDelta = (focal - _twoFingerFocalDown).distance;
         if (distDelta > 12.0 || focalDelta > 12.0) {
           _twoFingerMoved = true;
         }
-        if (distDelta > 14.0) {
-          _isTwoFingerPinch = true;
+        if (!_isTwoFingerPinch) {
+          if (distDelta > 14.0) {
+            final Offset start0 = _twoFingerStartPositions[id0] ?? p0;
+            final Offset start1 = _twoFingerStartPositions[id1] ?? p1;
+            final Offset d0 = p0 - start0;
+            final Offset d1 = p1 - start1;
+            final bool bothMoved = d0.distance > 4.0 && d1.distance > 4.0;
+            final bool nonParallel = (d0.dx * d1.dx + d0.dy * d1.dy) <= 0.0;
+            if (bothMoved && nonParallel) {
+              _isTwoFingerPinch = true;
+            } else {
+              _twoFingerPinchConfirmCount++;
+              if (_twoFingerPinchConfirmCount >= 2) {
+                _isTwoFingerPinch = true;
+              }
+            }
+          } else {
+            _twoFingerPinchConfirmCount = 0;
+          }
         }
         if (_isTwoFingerPinch) {
           widget.viewportController.setZoom(
@@ -508,6 +537,8 @@ class _SessionCanvasState extends State<SessionCanvas> {
           _twoFingerGestureActive = false;
           _twoFingerMoved = false;
           _isTwoFingerPinch = false;
+          _twoFingerStartPositions.clear();
+          _twoFingerPinchConfirmCount = 0;
           _lastTwoFingerFocal = null;
         }
         return;
@@ -570,6 +601,8 @@ class _SessionCanvasState extends State<SessionCanvas> {
       _twoFingerGestureActive = false;
       _twoFingerMoved = false;
       _isTwoFingerPinch = false;
+      _twoFingerStartPositions.clear();
+      _twoFingerPinchConfirmCount = 0;
       _lastTwoFingerFocal = null;
     }
     _releaseTouchButton(Offset(_virtualCursorX, _virtualCursorY));

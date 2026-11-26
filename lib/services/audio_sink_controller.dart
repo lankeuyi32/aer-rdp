@@ -104,6 +104,7 @@ class AudioSinkController {
   RdpSessionController? _session;
   Timer? _pumpTimer;
   bool _platformAvailable = false;
+  bool _platformOpenedOrOpening = false;
   bool _platformPaused = false;
   bool _appPaused = false;
   bool _muted = false;
@@ -112,11 +113,51 @@ class AudioSinkController {
   int _lastPlayedDelta = 0;
   Stopwatch? _virtualClock;
   bool _pumpInFlight = false;
+  int _generation = 0;
+  Future<void> _platformQueue = Future<void>.value();
 
   bool get isMuted => _muted;
   double get volume => _volume;
   bool get isRunning => _pumpTimer != null;
   bool get isPaused => _appPaused || _platformPaused;
+
+  Future<T> _enqueuePlatform<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _platformQueue = _platformQueue.then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+
+  void _resetActiveStateSync() {
+    _pumpTimer?.cancel();
+    _pumpTimer = null;
+    _pumpInFlight = false;
+    _virtualClock?.stop();
+    _virtualClock = null;
+    _session = null;
+    _lastPlayedDelta = 0;
+    _platformAvailable = false;
+    _platformPaused = false;
+  }
+
+  Future<void> _closePlatformIfNeeded() async {
+    if (!_platformOpenedOrOpening) return;
+    _platformOpenedOrOpening = false;
+    try {
+      await _platform.close();
+    } on MissingPluginException {
+      // Ignore on headless tests.
+    } on PlatformException {
+      // Ignore on teardown.
+    } on UnimplementedError {
+      // Ignore on unsupported platforms.
+    }
+  }
 
   Future<void> start({
     required RdpSessionController session,
@@ -124,39 +165,89 @@ class AudioSinkController {
     required int channels,
     required int bitsPerSample,
   }) async {
-    await stop();
-    _session = session;
-    _sampleRate = sampleRate > 0 ? sampleRate : 48000;
-    _lastPlayedDelta = 0;
-    _platformPaused = false;
-    _virtualClock = Stopwatch()..start();
+    final int gen = ++_generation;
+    _resetActiveStateSync();
+    final int effectiveSampleRate = sampleRate > 0 ? sampleRate : 48000;
 
-    try {
-      _platformAvailable = await _platform.open(
-        sampleRate: _sampleRate,
-        channels: channels,
-        bitsPerSample: bitsPerSample,
-      );
-      if (_appPaused && _platformAvailable) {
-        await _platform.pause();
-        _platformPaused = true;
+    await _enqueuePlatform(() async {
+      await _closePlatformIfNeeded();
+      if (gen != _generation) return;
+
+      bool opened = false;
+      try {
+        _platformOpenedOrOpening = true;
+        opened = await _platform.open(
+          sampleRate: effectiveSampleRate,
+          channels: channels,
+          bitsPerSample: bitsPerSample,
+        );
+      } on MissingPluginException {
+        _platformOpenedOrOpening = false;
+        opened = false;
+      } on PlatformException {
+        _platformOpenedOrOpening = false;
+        opened = false;
+      } on UnimplementedError {
+        _platformOpenedOrOpening = false;
+        opened = false;
+      } catch (_) {
+        _platformOpenedOrOpening = false;
+        rethrow;
       }
-    } on MissingPluginException {
-      _platformAvailable = false;
-    } on PlatformException {
-      _platformAvailable = false;
-    } on UnimplementedError {
-      _platformAvailable = false;
-    }
 
-    _pumpTimer = Timer.periodic(
-      const Duration(milliseconds: 20),
-      (_) => unawaited(pumpOnce()),
-    );
+      if (!opened) {
+        _platformOpenedOrOpening = false;
+      }
+
+      if (gen != _generation) {
+        await _closePlatformIfNeeded();
+        return;
+      }
+
+      bool pausedAtStart = false;
+      if (opened && _appPaused) {
+        try {
+          await _platform.pause();
+          if (gen != _generation) {
+            await _closePlatformIfNeeded();
+            return;
+          }
+          pausedAtStart = true;
+        } on MissingPluginException {
+          await _closePlatformIfNeeded();
+          opened = false;
+        } on PlatformException {
+          if (gen != _generation) {
+            await _closePlatformIfNeeded();
+            return;
+          }
+        } on UnimplementedError {
+          await _closePlatformIfNeeded();
+          opened = false;
+        }
+      }
+
+      if (gen != _generation) {
+        await _closePlatformIfNeeded();
+        return;
+      }
+
+      _session = session;
+      _sampleRate = effectiveSampleRate;
+      _lastPlayedDelta = 0;
+      _platformAvailable = opened;
+      _platformPaused = pausedAtStart;
+      _virtualClock = Stopwatch()..start();
+      _pumpTimer = Timer.periodic(
+        const Duration(milliseconds: 20),
+        (_) => unawaited(pumpOnce()),
+      );
+    });
   }
 
   Future<void> pumpOnce() async {
     final session = _session;
+    final int gen = _generation;
     if (session == null || _pumpInFlight) return;
     _pumpInFlight = true;
     try {
@@ -194,20 +285,31 @@ class AudioSinkController {
         } else {
           status = await _platform.writePcm(stats.pcmBytes ?? Uint8List(0));
         }
+        if (gen != _generation || _session != session) {
+          return;
+        }
         _platformPaused = status.paused;
         _lastPlayedDelta = _platformPaused ? 0 : status.framesPlayedDelta;
         if (!_platformPaused) {
           _virtualClock?.reset();
         }
       } on MissingPluginException {
+        if (gen != _generation || _session != session) return;
         _platformAvailable = false;
         _lastPlayedDelta = 0;
       } on PlatformException {
+        if (gen != _generation || _session != session) return;
+        _platformAvailable = false;
+        _lastPlayedDelta = 0;
+      } on UnimplementedError {
+        if (gen != _generation || _session != session) return;
         _platformAvailable = false;
         _lastPlayedDelta = 0;
       }
     } finally {
-      _pumpInFlight = false;
+      if (gen == _generation) {
+        _pumpInFlight = false;
+      }
     }
   }
 
@@ -223,48 +325,55 @@ class AudioSinkController {
 
   Future<void> onAppPaused() async {
     _appPaused = true;
-    if (_platformAvailable) {
+    final int gen = _generation;
+    await _enqueuePlatform(() async {
+      if (gen != _generation || !_platformAvailable || !_appPaused) return;
       try {
         await _platform.pause();
+        if (gen == _generation && _platformAvailable && _appPaused) {
+          _platformPaused = true;
+        }
       } on MissingPluginException {
-        _platformAvailable = false;
+        if (gen == _generation) {
+          _platformAvailable = false;
+        }
       } on PlatformException {
         // Ignore platform pause errors.
+      } on UnimplementedError {
+        if (gen == _generation) {
+          _platformAvailable = false;
+        }
       }
-    }
+    });
   }
 
   Future<void> onAppResumed() async {
     _appPaused = false;
     _platformPaused = false;
-    if (_platformAvailable) {
+    final int gen = _generation;
+    await _enqueuePlatform(() async {
+      if (gen != _generation || !_platformAvailable || _appPaused) return;
       try {
         await _platform.resume();
       } on MissingPluginException {
-        _platformAvailable = false;
+        if (gen == _generation) {
+          _platformAvailable = false;
+        }
       } on PlatformException {
         // Ignore platform resume errors.
+      } on UnimplementedError {
+        if (gen == _generation) {
+          _platformAvailable = false;
+        }
       }
-    }
+    });
   }
 
   Future<void> stop() async {
-    _pumpTimer?.cancel();
-    _pumpTimer = null;
-    _virtualClock?.stop();
-    _virtualClock = null;
-    _session = null;
-    _lastPlayedDelta = 0;
-    if (_platformAvailable) {
-      try {
-        await _platform.close();
-      } on MissingPluginException {
-        // Ignore on headless tests.
-      } on PlatformException {
-        // Ignore on teardown.
-      }
-    }
-    _platformAvailable = false;
-    _platformPaused = false;
+    _generation++;
+    _resetActiveStateSync();
+    await _enqueuePlatform(() async {
+      await _closePlatformIfNeeded();
+    });
   }
 }

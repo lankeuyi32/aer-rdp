@@ -41,6 +41,8 @@ enum ScriptAction {
     WaitFrames {
         #[serde(default = "default_min_frames", alias = "minFrames")]
         min_frames: u64,
+        #[serde(default, alias = "syncOnly")]
+        sync_only: bool,
         #[serde(default = "default_timeout_ms", alias = "timeoutMs")]
         timeout_ms: u64,
     },
@@ -350,6 +352,7 @@ async fn main() -> ExitCode {
     let mut is_active = false;
     let mut is_disconnected = false;
     let mut audio_stream_opened = false;
+    let mut frames_synced: u64 = 0;
 
     for action in actions {
         match action {
@@ -371,6 +374,7 @@ async fn main() -> ExitCode {
                                 &mut is_active,
                                 &mut is_disconnected,
                                 &mut audio_stream_opened,
+                                &mut frames_synced,
                             );
                         }
                         Ok(None) => {
@@ -386,15 +390,23 @@ async fn main() -> ExitCode {
             }
             ScriptAction::WaitFrames {
                 min_frames,
+                sync_only,
                 timeout_ms,
             } => {
                 let deadline = tokio::time::Instant::now() + Duration::from_millis(timeout_ms);
-                while report.frames_received < min_frames && !is_disconnected {
+                loop {
+                    let count = if sync_only {
+                        frames_synced
+                    } else {
+                        report.frames_received
+                    };
+                    if count >= min_frames || is_disconnected {
+                        break;
+                    }
                     let now = tokio::time::Instant::now();
                     if now >= deadline {
                         report.errors.push(format!(
-                            "timeout waiting for {min_frames} frames (got {}, {timeout_ms}ms)",
-                            report.frames_received
+                            "timeout waiting for {min_frames} frames (sync_only={sync_only}, got {count}, {timeout_ms}ms)"
                         ));
                         break;
                     }
@@ -408,6 +420,7 @@ async fn main() -> ExitCode {
                                 &mut is_active,
                                 &mut is_disconnected,
                                 &mut audio_stream_opened,
+                                &mut frames_synced,
                             );
                         }
                         Ok(None) => {
@@ -415,9 +428,13 @@ async fn main() -> ExitCode {
                             break;
                         }
                         Err(_) => {
-                            report.errors.push(format!(
-                                "timeout waiting for {min_frames} frames (got {}, {timeout_ms}ms)",
+                            let count = if sync_only {
+                                frames_synced
+                            } else {
                                 report.frames_received
+                            };
+                            report.errors.push(format!(
+                                "timeout waiting for {min_frames} frames (sync_only={sync_only}, got {count}, {timeout_ms}ms)"
                             ));
                             break;
                         }
@@ -456,6 +473,7 @@ async fn main() -> ExitCode {
                                 &mut is_active,
                                 &mut is_disconnected,
                                 &mut audio_stream_opened,
+                                &mut frames_synced,
                             );
                         }
                         Ok(None) => {
@@ -530,6 +548,7 @@ async fn main() -> ExitCode {
                         &mut is_active,
                         &mut is_disconnected,
                         &mut audio_stream_opened,
+                        &mut frames_synced,
                     );
                     if is_disconnected {
                         break;
@@ -579,6 +598,7 @@ async fn main() -> ExitCode {
                                 &mut is_active,
                                 &mut is_disconnected,
                                 &mut audio_stream_opened,
+                                &mut frames_synced,
                             );
                         }
                         Ok(None) => {
@@ -607,6 +627,7 @@ async fn main() -> ExitCode {
                                     &mut is_active,
                                     &mut is_disconnected,
                                     &mut audio_stream_opened,
+                                    &mut frames_synced,
                                 );
                             }
                             Ok(None) => {
@@ -631,6 +652,7 @@ async fn main() -> ExitCode {
                                 &mut is_active,
                                 &mut is_disconnected,
                                 &mut audio_stream_opened,
+                                &mut frames_synced,
                             );
                         }
                         Ok(None) => {
@@ -652,6 +674,7 @@ async fn main() -> ExitCode {
         &mut is_active,
         &mut is_disconnected,
         &mut audio_stream_opened,
+        &mut frames_synced,
     );
 
     if report.cert_sha256.is_none() {
@@ -682,6 +705,7 @@ async fn main() -> ExitCode {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn drain_pending_events(
     event_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     handle: &rdp_core::SessionHandle,
@@ -690,6 +714,7 @@ fn drain_pending_events(
     is_active: &mut bool,
     is_disconnected: &mut bool,
     audio_stream_opened: &mut bool,
+    frames_synced: &mut u64,
 ) {
     while let Ok(ev) = event_rx.try_recv() {
         process_event(
@@ -700,10 +725,12 @@ fn drain_pending_events(
             is_active,
             is_disconnected,
             audio_stream_opened,
+            frames_synced,
         );
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_event(
     ev: &SessionEvent,
     handle: &rdp_core::SessionHandle,
@@ -712,6 +739,7 @@ fn process_event(
     is_active: &mut bool,
     is_disconnected: &mut bool,
     audio_stream_opened: &mut bool,
+    frames_synced: &mut u64,
 ) {
     match ev {
         SessionEvent::SessionStateChanged(state) => match state {
@@ -758,8 +786,16 @@ fn process_event(
                 }
             }
         },
-        SessionEvent::FrameUpdated { width, height, .. } => {
+        SessionEvent::FrameUpdated {
+            width,
+            height,
+            frame_sync,
+            ..
+        } => {
             report.frames_received += 1;
+            if *frame_sync {
+                *frames_synced += 1;
+            }
             report.width = *width;
             report.height = *height;
         }
@@ -810,6 +846,7 @@ mod tests {
             parsed[1],
             ScriptAction::WaitFrames {
                 min_frames: 2,
+                sync_only: false,
                 timeout_ms: 4000
             }
         );
@@ -879,5 +916,19 @@ mod tests {
     fn rejects_unicode_without_text_or_code_unit() {
         let raw = r#"[{"action": "unicode"}]"#;
         assert!(parse_script_json(raw).is_err());
+    }
+
+    #[test]
+    fn parses_wait_frames_sync_only_flag() {
+        let raw = r#"[{"action": "wait_frames", "minFrames": 1, "syncOnly": true, "timeoutMs": 5000}]"#;
+        let parsed = parse_script_json(raw).expect("valid wait_frames script");
+        assert_eq!(
+            parsed,
+            vec![ScriptAction::WaitFrames {
+                min_frames: 1,
+                sync_only: true,
+                timeout_ms: 5000,
+            }]
+        );
     }
 }

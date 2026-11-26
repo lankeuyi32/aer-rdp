@@ -119,6 +119,9 @@ AER_RDP_CLI_FLAGS: tuple[str, ...] = (
 
 AER_RDP_CLI_ACTIONS: frozenset[str] = frozenset({
     "wait_active",
+    "wait_frames",
+    "wait_audio_ready",
+    "wait_ms",
     "pointer",
     "scancode",
     "unicode",

@@ -124,7 +124,11 @@ class TestTier1FA03Protocol(WireE2ETestCase):
             user="testuser",
             password="testpass",
             domain="",
-            actions=[{"action": "wait_active", "timeoutMs": 5000}, {"action": "disconnect"}],
+            actions=[
+                {"action": "wait_active", "timeoutMs": 5000},
+                {"action": "wait_frames", "minFrames": 1, "timeoutMs": 5000},
+                {"action": "disconnect"},
+            ],
         )
         self.assertEqual(res.returncode, 0, res.stderr)
         assert res.report is not None
@@ -153,6 +157,7 @@ class TestTier1FA03Protocol(WireE2ETestCase):
             audio="local",
             actions=[
                 {"action": "wait_active", "timeoutMs": 5000},
+                {"action": "wait_audio_ready", "minQueuedMs": 20, "timeoutMs": 5000},
                 {"action": "drain_audio", "durationMs": 600},
                 {"action": "disconnect"},
             ],
@@ -169,7 +174,11 @@ class TestTier1FA03Protocol(WireE2ETestCase):
         res = self.run_cli(
             port=srv.rdp_port,
             audio="local",
-            actions=[{"action": "wait_active", "timeoutMs": 5000}, {"action": "disconnect"}],
+            actions=[
+                {"action": "wait_active", "timeoutMs": 5000},
+                {"action": "wait_frames", "minFrames": 1, "timeoutMs": 5000},
+                {"action": "disconnect"},
+            ],
         )
         self.assertEqual(res.returncode, 0, res.stderr)
         assert res.report is not None
@@ -280,7 +289,11 @@ class TestTier1FA04Lifecycle(WireE2ETestCase):
         for idx in range(2):
             res = self.run_cli(
                 port=srv.rdp_port,
-                actions=[{"action": "wait_active", "timeoutMs": 5000}, {"action": "disconnect"}],
+                actions=[
+                    {"action": "wait_active", "timeoutMs": 5000},
+                    {"action": "wait_frames", "minFrames": 1, "timeoutMs": 5000},
+                    {"action": "disconnect"},
+                ],
             )
             self.assertEqual(res.returncode, 0, f"Run {idx} failed: {res.stderr}")
             assert res.report is not None
@@ -298,7 +311,11 @@ class TestTier1FA05Graphics(WireE2ETestCase):
             port=srv.rdp_port,
             width=800,
             height=600,
-            actions=[{"action": "wait_active", "timeoutMs": 5000}, {"action": "disconnect"}],
+            actions=[
+                {"action": "wait_active", "timeoutMs": 5000},
+                {"action": "wait_frames", "minFrames": 1, "timeoutMs": 5000},
+                {"action": "disconnect"},
+            ],
         )
         self.assertEqual(res.returncode, 0, res.stderr)
         assert res.report is not None
@@ -313,7 +330,11 @@ class TestTier1FA05Graphics(WireE2ETestCase):
             port=srv.rdp_port,
             width=800,
             height=600,
-            actions=[{"action": "wait_active", "timeoutMs": 5000}, {"action": "disconnect"}],
+            actions=[
+                {"action": "wait_active", "timeoutMs": 5000},
+                {"action": "wait_frames", "minFrames": 1, "timeoutMs": 5000},
+                {"action": "disconnect"},
+            ],
         )
         self.assertEqual(res.returncode, 0, res.stderr)
         assert res.report is not None
@@ -852,13 +873,18 @@ class TestTier1FA11TestServer(WireE2ETestCase):
             port=srv.rdp_port,
             actions=[
                 {"action": "wait_active", "timeoutMs": 5000},
+                {"action": "wait_frames", "minFrames": 1, "syncOnly": True, "timeoutMs": 5000},
                 {"action": "drain_audio", "durationMs": 400},
+                {"action": "wait_ms", "durationMs": 20},
                 {"action": "disconnect"},
             ],
         )
         self.assertEqual(res.returncode, 0, res.stderr)
-        time.sleep(0.1)
+        deadline = time.monotonic() + 1.0
         after = srv.metrics()
+        while after["activeSessions"] != 0 and time.monotonic() < deadline:
+            time.sleep(0.05)
+            after = srv.metrics()
         self.assertEqual(after["activeSessions"], 0)
         self.assertGreaterEqual(after["framesSent"], 1)
 

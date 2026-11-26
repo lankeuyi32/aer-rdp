@@ -347,6 +347,14 @@ class _AerRdpAppState extends State<AerRdpApp> {
               initialHeight: _activeHeight,
               onAttached: _onSessionPageAttached,
               onEnded: _endSession,
+              onDisconnected: (reason, clean) {
+                _endSession();
+                if (!clean && reason.isNotEmpty) {
+                  _messengerKey.currentState?.showSnackBar(
+                    SnackBar(content: Text(reason)),
+                  );
+                }
+              },
             )
           : ConnectionCenterPage(
               profileStore: _profileStore,

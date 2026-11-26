@@ -189,7 +189,26 @@ def validate_cli_script(script: Any) -> list[str]:
         if act not in AER_RDP_CLI_ACTIONS:
             errors.append(f"{prefix}.action: unknown action {act!r}.")
             continue
-        if act == "pointer":
+        if act == "wait_active":
+            if "timeoutMs" in step and (not _is_int(step["timeoutMs"]) or step["timeoutMs"] < 0):
+                errors.append(f"{prefix}.timeoutMs: must be non-negative integer.")
+        elif act == "wait_frames":
+            if "minFrames" in step and (not _is_int(step["minFrames"]) or step["minFrames"] < 0):
+                errors.append(f"{prefix}.minFrames: must be non-negative integer.")
+            if "syncOnly" in step and not isinstance(step["syncOnly"], bool):
+                errors.append(f"{prefix}.syncOnly: must be boolean.")
+            if "timeoutMs" in step and (not _is_int(step["timeoutMs"]) or step["timeoutMs"] < 0):
+                errors.append(f"{prefix}.timeoutMs: must be non-negative integer.")
+        elif act == "wait_audio_ready":
+            if "minQueuedMs" in step and (not _is_int(step["minQueuedMs"]) or step["minQueuedMs"] < 0):
+                errors.append(f"{prefix}.minQueuedMs: must be non-negative integer.")
+            if "timeoutMs" in step and (not _is_int(step["timeoutMs"]) or step["timeoutMs"] < 0):
+                errors.append(f"{prefix}.timeoutMs: must be non-negative integer.")
+        elif act == "wait_ms":
+            dur = step.get("durationMs") if "durationMs" in step else step.get("ms")
+            if not _is_int(dur) or dur < 0:
+                errors.append(f"{prefix}: wait_ms requires non-negative integer 'durationMs'.")
+        elif act == "pointer":
             if not _is_int(step.get("x")) or not _is_int(step.get("y")):
                 errors.append(f"{prefix}: pointer requires integer 'x' and 'y'.")
             if "buttonMask" in step and not _is_int(step["buttonMask"]):

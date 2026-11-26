@@ -213,3 +213,99 @@ async fn t17_aer_rdp_cli_json_smoke_and_http_control() {
     let _ = std::fs::remove_file(&report2);
     server.shutdown().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn t18_aer_rdp_cli_wait_frames_sync_only_guarantees_server_frames_sent() {
+    let server = MockRdpServer::start(MockConfig {
+        auth_mode: AuthMode::Nla,
+        username: "testuser".to_owned(),
+        password: "testpass".to_owned(),
+        desktop_width: 1280,
+        desktop_height: 720,
+        audio_hz: 440,
+        auto_audio_interval_ms: Some(20),
+        rdpsnd_version: 8,
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    let tmp_dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let script_path = tmp_dir.join("cli_sync_only_actions.json");
+    let report_path = tmp_dir.join("cli_sync_only_report.json");
+
+    let actions = serde_json::json!([
+        { "action": "wait_active", "timeoutMs": 5000 },
+        { "action": "wait_frames", "minFrames": 1, "syncOnly": true, "timeoutMs": 5000 },
+        { "action": "disconnect" }
+    ]);
+    std::fs::write(&script_path, serde_json::to_vec_pretty(&actions).unwrap()).unwrap();
+
+    let cli_bin = env!("CARGO_BIN_EXE_aer-rdp-cli");
+    let rdp_port = server.port();
+    let cert_pin = format!("sha256:{}", server.cert_sha256());
+
+    let mut prev_frames_sent = 0u64;
+    for run_idx in 0..5 {
+        let bin = cli_bin.to_owned();
+        let pin = cert_pin.clone();
+        let script_arg = script_path.clone();
+        let report_arg = report_path.clone();
+        let output = tokio::task::spawn_blocking(move || {
+            Command::new(bin)
+                .args([
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    &rdp_port.to_string(),
+                    "--auth",
+                    "nla",
+                    "--user",
+                    "testuser",
+                    "--pass",
+                    "testpass",
+                    "--width",
+                    "1280",
+                    "--height",
+                    "720",
+                    "--audio",
+                    "local",
+                    "--trust-cert",
+                    &pin,
+                    "--script",
+                    script_arg.to_str().unwrap(),
+                    "--out",
+                    report_arg.to_str().unwrap(),
+                ])
+                .output()
+                .expect("spawn aer-rdp-cli")
+        })
+        .await
+        .unwrap();
+
+        assert!(
+            output.status.success(),
+            "run {run_idx} failed (status={:?}): stderr={}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let report_raw = std::fs::read_to_string(&report_path).unwrap();
+        let report: serde_json::Value = serde_json::from_str(&report_raw).unwrap();
+        assert_eq!(report["connected"], true, "run {run_idx} report: {report_raw}");
+        assert_eq!(report["errors"], serde_json::json!([]), "run {run_idx} report: {report_raw}");
+
+        let now_frames_sent = server.metrics().frames_sent;
+        assert!(
+            now_frames_sent > prev_frames_sent,
+            "run {run_idx} finished before server incremented frames_sent (prev={prev_frames_sent}, now={now_frames_sent})"
+        );
+        prev_frames_sent = now_frames_sent;
+    }
+
+    assert!(server.metrics().frames_sent >= 5);
+
+    let _ = std::fs::remove_file(&script_path);
+    let _ = std::fs::remove_file(&report_path);
+    server.shutdown().await;
+}

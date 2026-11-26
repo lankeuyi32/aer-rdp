@@ -369,5 +369,56 @@ void main() {
       expect(ptrs.last.down, isFalse);
       expect(ptrs.last.buttonMask, RdpPointerButtons.left);
     });
+
+    testWidgets(
+        'fast narrow staggered 2-finger vertical drag scrolls without latching pinch, and anchored 1-finger pinch still zooms',
+        (WidgetTester tester) async {
+      final (controller, vp) = await pumpCanvas(tester);
+      final center = tester.getCenter(find.byKey(AerKeys.sessionCanvas));
+
+      // Fast staggered 2-finger vertical scroll (40px apart, 60px then 40px vertical step).
+      final g1 = await tester.startGesture(
+        center - const Offset(20, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      final g2 = await tester.startGesture(
+        center + const Offset(20, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      await g1.moveBy(const Offset(0, -60));
+      await g2.moveBy(const Offset(0, -60));
+      await tester.pump();
+      await g1.moveBy(const Offset(0, -40));
+      await g2.moveBy(const Offset(0, -40));
+      await tester.pump();
+      await g1.up();
+      await g2.up();
+      await tester.pump();
+
+      expect(vp.zoom, closeTo(1.0, 0.01));
+      final scrollEvents = controller.recordedInputs
+          .where((e) => e.kind == 'pointer' && e.wheelDeltaV != 0)
+          .toList();
+      expect(scrollEvents, isNotEmpty);
+
+      // Anchored 1-finger pinch (1 finger stationary, 1 finger spreads twice) still zooms > 1.5.
+      final a1 = await tester.startGesture(
+        center - const Offset(20, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      final a2 = await tester.startGesture(
+        center + const Offset(20, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      await a2.moveBy(const Offset(25, 0));
+      await tester.pump();
+      await a2.moveBy(const Offset(25, 0));
+      await tester.pump();
+      await a1.up();
+      await a2.up();
+      await tester.pump();
+
+      expect(vp.zoom, greaterThan(1.5));
+    });
   });
 }

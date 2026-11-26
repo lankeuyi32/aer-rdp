@@ -222,6 +222,7 @@ async fn handle_client(
                 recorded_inputs,
                 &mut control_rx,
                 session_start,
+                false,
             )
             .await
         }
@@ -233,7 +234,8 @@ async fn handle_client(
             let mut tls_framed = TokioFramed::new(tls_stream);
             acceptor.mark_security_upgrade_as_done();
 
-            if acceptor.should_perform_credssp() {
+            let did_credssp = acceptor.should_perform_credssp();
+            if did_credssp {
                 run_credssp(
                     &mut tls_framed,
                     protocol,
@@ -258,12 +260,14 @@ async fn handle_client(
                 recorded_inputs,
                 &mut control_rx,
                 session_start,
+                did_credssp,
             )
             .await
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_post_tls_session<S>(
     mut framed: TokioFramed<S>,
     mut acceptor: Acceptor,
@@ -272,6 +276,7 @@ async fn run_post_tls_session<S>(
     recorded_inputs: Arc<Mutex<Vec<RecordedInput>>>,
     control_rx: &mut broadcast::Receiver<ControlCmd>,
     session_start: Instant,
+    did_credssp: bool,
 ) -> anyhow::Result<()>
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + Sync,
@@ -289,14 +294,22 @@ where
         let (new_framed, mut result) = accept_finalize(framed, &mut acceptor).await?;
         framed = new_framed;
 
-        // Check TLS-mode ClientInfo credentials when client supplies non-empty credentials
-        if matches!(config.auth_mode, AuthMode::Tls)
+        // Check ClientInfo credentials when CredSSP was skipped (TLS mode or Auto->TLS fallback)
+        // and the client supplies non-empty credentials.
+        if !did_credssp
+            && matches!(config.auth_mode, AuthMode::Tls | AuthMode::Auto)
             && !config.username.is_empty()
             && let Some(ref creds) = result.credentials
             && !creds.username.is_empty()
         {
+            let domain_ok = config.domain.is_empty()
+                || creds
+                    .domain
+                    .as_deref()
+                    .unwrap_or("")
+                    .eq_ignore_ascii_case(&config.domain);
             let creds_match =
-                creds.username == config.username && creds.password == config.password;
+                creds.username == config.username && creds.password == config.password && domain_ok;
             if !creds_match {
                 {
                     let mut m = metrics.lock().expect("metrics lock");
@@ -334,9 +347,7 @@ where
 
         // Process any input backlog received during finalization
         for backlog_frame in core::mem::take(&mut result.input_events) {
-            if let Ok(Action::FastPath) = Action::from_fp_output_header(backlog_frame[0])
-                && let Ok(fp) = decode::<FastPathInput>(&backlog_frame)
-            {
+            if let Some(fp) = parse_fastpath_backlog_frame(&backlog_frame) {
                 record_fastpath_inputs(&fp, &mut scene, &recorded_inputs, session_start);
             }
         }
@@ -1111,6 +1122,15 @@ fn record_fastpath_inputs(
     }
 }
 
+fn parse_fastpath_backlog_frame(frame: &[u8]) -> Option<FastPathInput> {
+    let &first = frame.first()?;
+    if matches!(Action::from_fp_output_header(first), Ok(Action::FastPath)) {
+        decode::<FastPathInput>(frame).ok()
+    } else {
+        None
+    }
+}
+
 fn record_slowpath_inputs(
     events: &[InputEvent],
     scene: &mut DisplaySceneState,
@@ -1129,5 +1149,16 @@ fn record_slowpath_inputs(
             });
             scene.last_key_code = sc.key_code;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_backlog_frame_does_not_panic() {
+        assert!(parse_fastpath_backlog_frame(&[]).is_none());
+        assert!(parse_fastpath_backlog_frame(&[0x03]).is_none());
     }
 }

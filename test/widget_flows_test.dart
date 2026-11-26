@@ -420,6 +420,90 @@ void main() {
     expect(result!.profile.authMode, AuthMode.saved);
     expect(result!.preserveSavedPassword, isTrue);
   });
+
+  testWidgets(
+      'AerRdpApp surfaces SnackBar on post-mount unclean Disconnected without losing clean-disconnect behavior',
+      (WidgetTester tester) async {
+    final client = _DelayedAudioSessionClient();
+    final store = ProfileStore.inMemory(<ConnectionProfile>[
+      const ConnectionProfile(
+        id: 'disc-1',
+        name: 'DiscHost',
+        host: '127.0.0.1',
+        authMode: AuthMode.saved,
+      ),
+    ]);
+    final vault = CredentialVault.inMemory();
+    await vault.savePassword('disc-1', 'pw');
+    final trust = CertTrustStore.inMemory(<String, String>{
+      '127.0.0.1:3389': DemoRdpSessionClient.defaultDemoFingerprint,
+    });
+
+    await tester.pumpWidget(
+      AerRdpApp(
+        profileStore: store,
+        credentialVault: vault,
+        certTrustStore: trust,
+        sessionClient: client,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Unclean post-mount disconnect surfaces SnackBar with disconnectReason.
+    await tester.tap(find.text('DiscHost'));
+    await tester.pump();
+    client.controller.emit(
+      const SessionStateChangedEvent(
+        SessionState.active(width: 1280, height: 720),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(AerKeys.sessionPage), findsOneWidget);
+
+    client.controller.emit(
+      const SessionStateChangedEvent(
+        SessionState.disconnected(
+          reason: 'TCP connection reset by peer',
+          clean: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(AerKeys.connectionCenterPage), findsOneWidget);
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('TCP connection reset by peer'), findsOneWidget);
+
+    // Clear SnackBar before clean disconnect check.
+    ScaffoldMessenger.of(
+      tester.element(find.byKey(AerKeys.connectionCenterPage)),
+    ).clearSnackBars();
+    await tester.pumpAndSettle();
+
+    // Clean post-mount disconnect returns without showing a SnackBar.
+    client.resetController();
+    await tester.tap(find.text('DiscHost'));
+    await tester.pump();
+    client.controller.emit(
+      const SessionStateChangedEvent(
+        SessionState.active(width: 1280, height: 720),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(AerKeys.sessionPage), findsOneWidget);
+
+    client.controller.emit(
+      const SessionStateChangedEvent(
+        SessionState.disconnected(
+          reason: 'user initiated disconnect',
+          clean: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(AerKeys.connectionCenterPage), findsOneWidget);
+    expect(find.text('user initiated disconnect'), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+  });
 }
 
 class _SlowNullCredentialVault extends CredentialVault {

@@ -1691,3 +1691,98 @@ async fn odd_width_853x480_honored_without_stride_skew() {
     .await;
     server.shutdown().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn t20_auto_mode_tls_fallback_rejects_wrong_client_info_creds() {
+    let server = MockRdpServer::start(MockConfig {
+        auth_mode: AuthMode::Auto,
+        username: "u".to_owned(),
+        password: "good".to_owned(),
+        domain: "CORP".to_owned(),
+        audio_hz: 0,
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    let cfg = ConnectConfig {
+        host: "127.0.0.1".to_owned(),
+        port: server.port(),
+        security_mode: SecurityMode::Tls,
+        audio_mode: AudioMode::Off,
+        pinned_cert_sha256: Some(server.cert_sha256().to_owned()),
+        ..Default::default()
+    };
+
+    let bad_cases = [
+        ("u", Some("CORP"), "bad", 1u64),
+        ("other", Some("CORP"), "good", 2u64),
+        ("u", Some("OTHER"), "good", 3u64),
+    ];
+
+    for (user, dom, pass, expected_failures) in bad_cases {
+        let (_handle, mut rx) = connect(
+            cfg.clone(),
+            Some(AuthCredentials {
+                username: user.to_owned(),
+                domain: dom.map(str::to_owned),
+                password: pass.to_owned(),
+            }),
+        )
+        .unwrap();
+
+        let disc = recv_until(&mut rx, Duration::from_secs(5), |e| {
+            matches!(
+                e,
+                SessionEvent::SessionStateChanged(SessionState::Disconnected { .. })
+            )
+        })
+        .await
+        .expect("Auto->TLS fallback mismatch must disconnect");
+        match disc {
+            SessionEvent::SessionStateChanged(SessionState::Disconnected { reason, .. }) => {
+                let lower = reason.to_ascii_lowercase();
+                assert!(
+                    lower.contains("denied") || reason.contains("ServerDeniedConnection"),
+                    "unexpected disconnect reason: {reason}"
+                );
+            }
+            _ => unreachable!(),
+        }
+
+        wait_for_metric(&server, Duration::from_millis(500), |m| {
+            m.auth_failures == expected_failures && m.active_sessions == 0
+        })
+        .await;
+        let m = server.metrics();
+        assert_eq!(m.auth_failures, expected_failures);
+        assert_eq!(m.active_sessions, 0);
+    }
+
+    // Valid credentials must succeed via Auto->TLS fallback
+    let (handle_ok, mut rx_ok, _) = connect_and_accept_cert(
+        cfg,
+        Some(AuthCredentials {
+            username: "u".to_owned(),
+            domain: Some("CORP".to_owned()),
+            password: "good".to_owned(),
+        }),
+    )
+    .await;
+    let frame = recv_until(&mut rx_ok, Duration::from_secs(5), |e| {
+        matches!(e, SessionEvent::FrameUpdated { frame_sync: true, .. })
+    })
+    .await;
+    assert!(frame.is_some(), "expected initial frame on valid Auto->TLS creds");
+    handle_ok.disconnect().unwrap();
+    let _ = recv_until(&mut rx_ok, Duration::from_secs(3), |e| {
+        matches!(
+            e,
+            SessionEvent::SessionStateChanged(SessionState::Disconnected { .. })
+        )
+    })
+    .await;
+    wait_for_metric(&server, Duration::from_millis(500), |m| m.active_sessions == 0).await;
+    assert_eq!(server.metrics().active_sessions, 0);
+    server.shutdown().await;
+}
