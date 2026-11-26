@@ -1,0 +1,5 @@
+rust_input: crate::api
+rust_root: crates/rdp-ffi/
+dart_output: lib/src/rust/
+rust_output: crates/rdp-ffi/src/frb_generated.rs
+dart_entrypoint_class_name: RustLib

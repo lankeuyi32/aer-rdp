@@ -1,0 +1,19 @@
+[package]
+name = "rdp-ffi"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+name = "rdp_ffi"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+flutter_rust_bridge = "=2.13.0"
+rdp-core = { path = "../rdp-core" }
+tokio.workspace = true
+tracing.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

@@ -1,0 +1,13 @@
+[package]
+name = "rdp-test-server"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+ironrdp = { version = "0.17.0", default-features = false, features = ["core", "pdu", "svc", "rdpsnd", "graphics", "input"] }
+ironrdp-server.workspace = true
+tokio.workspace = true
+tracing.workspace = true

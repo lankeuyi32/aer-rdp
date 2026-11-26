@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rdp-core",
+    "crates/rdp-ffi",
+    "crates/rdp-test-server",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1.0"
+bytes = "1.12"
+sha2 = "0.11"
+thiserror = "2.0"
+tokio = { version = "1.54", features = ["rt-multi-thread", "net", "io-util", "sync", "time", "macros"] }
+tracing = "0.1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+ironrdp = { version = "0.17.0", default-features = false, features = ["core", "pdu", "connector", "session", "graphics", "input", "svc", "rdpsnd"] }
+ironrdp-tokio = "0.10.0"
+ironrdp-tls = { version = "0.2.2", default-features = false, features = ["rustls-ring"] }
+ironrdp-server = { version = "0.13.0", default-features = false, features = ["helper"] }

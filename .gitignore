@@ -1,0 +1,41 @@
+# Local environment / secrets
+.env.local
+scripts/.env.local
+*.pem
+*.key
+*ed25519*
+
+# Rust / Cargo
+target/
+
+# Flutter / Dart / Build artifacts
+build/
+artifacts/
+*.apk
+*.aab
+*.ipa
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Android generated / local
+android/.gradle/
+android/local.properties
+android/app/src/main/jniLibs/
+android/.cxx/
+
+# iOS generated / Pods
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Flutter.podspec
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
