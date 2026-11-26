@@ -26,7 +26,7 @@ echo "=== [4/5] flutter pub get && analyze && test && build apk --debug ==="
 flutter pub get
 flutter analyze
 flutter test
-flutter build apk --debug
+flutter build apk --debug --target-platform android-arm64,android-x64
 
 echo "=== [5/5] verify artifacts ==="
 for f in \
@@ -40,5 +40,56 @@ do
   fi
   ls -lh "$f"
 done
+
+APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+python3 - "$APK_PATH" <<'PY'
+import sys
+import zipfile
+
+apk_path = sys.argv[1]
+with zipfile.ZipFile(apk_path, "r") as zf:
+    bad_entry = zf.testzip()
+    if bad_entry is not None:
+        raise SystemExit(f"ERROR: corrupt zip entry in APK: {bad_entry}")
+
+    names = set(zf.namelist())
+    manifest_bytes = zf.read("AndroidManifest.xml")
+    manifest_utf16 = manifest_bytes.decode("utf-16le", errors="ignore")
+    manifest_utf8 = manifest_bytes.decode("utf-8", errors="ignore")
+    if "dev.aer.rdp.MainActivity" not in manifest_utf16 and "dev.aer.rdp.MainActivity" not in manifest_utf8:
+        raise SystemExit("ERROR: dev.aer.rdp.MainActivity missing from APK AndroidManifest.xml")
+
+    dex_names = sorted(n for n in names if n.startswith("classes") and n.endswith(".dex"))
+    if not dex_names:
+        raise SystemExit("ERROR: no classes*.dex found in APK")
+
+    has_target_activity = False
+    has_stale_activity = False
+    for dex_name in dex_names:
+        dex_bytes = zf.read(dex_name)
+        if b"Ldev/aer/rdp/MainActivity;" in dex_bytes:
+            has_target_activity = True
+        if b"Ldev/aer/aer_rdp/MainActivity;" in dex_bytes:
+            has_stale_activity = True
+
+    if not has_target_activity:
+        raise SystemExit("ERROR: Ldev/aer/rdp/MainActivity; missing from classes*.dex")
+    if has_stale_activity:
+        raise SystemExit("ERROR: stale Ldev/aer/aer_rdp/MainActivity; still present in classes*.dex")
+
+    for abi_so in ("lib/arm64-v8a/librdp_ffi.so", "lib/x86_64/librdp_ffi.so"):
+        if abi_so not in names:
+            raise SystemExit(f"ERROR: missing {abi_so} in APK")
+
+    stale_armeabi = [n for n in names if n.startswith("lib/armeabi-v7a/")]
+    if stale_armeabi:
+        raise SystemExit(f"ERROR: unexpected armeabi-v7a libraries in APK: {stale_armeabi}")
+
+print("APK manifest, DEX MainActivity, and ABI parity verified.")
+PY
+
+if [ -n "${ANDROID_HOME:-}" ] && [ -x "$ANDROID_HOME/build-tools/35.0.0/aapt2" ]; then
+  "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump badging "$APK_PATH" | grep -q "launchable-activity: name='dev.aer.rdp.MainActivity'"
+fi
 
 echo "=== M1 VERIFICATION PASSED ==="

@@ -43,7 +43,18 @@ if ($IncludeGenerated) {
     New-Item -ItemType Directory -Force -Path $localRustDartDir | Out-Null
 
     try {
-        $packCmd = "set -euo pipefail; tar -czf $remoteRustTgz -C $($cfg.RemoteDir)/lib/src/rust ."
+        $remoteDirQuoted = "'" + $cfg.RemoteDir.Replace("'", "'\''") + "'"
+        $remoteRustTgzQuoted = "'" + $remoteRustTgz.Replace("'", "'\''") + "'"
+        $packCmd = @"
+set -euo pipefail
+REMOTE_DIR_RAW=$remoteDirQuoted
+case "`$REMOTE_DIR_RAW" in
+  "~") REMOTE_DIR="`$HOME" ;;
+  "~/"*) REMOTE_DIR="`$HOME/`${REMOTE_DIR_RAW#~/}" ;;
+  *) REMOTE_DIR="`$REMOTE_DIR_RAW" ;;
+esac
+tar -czf $remoteRustTgzQuoted -C "`$REMOTE_DIR/lib/src/rust" .
+"@ -replace "`r`n", "`n"
         $b64 = [Convert]::ToBase64String([System.Text.UTF8Encoding]::new($false).GetBytes($packCmd + "`n"))
         & ssh @sshOpts -p $cfg.Port -i $cfg.KeyPath $cfg.Target "echo '$b64' | base64 -d | bash -s"
         if ($LASTEXITCODE -ne 0) { throw "Failed to pack lib/src/rust on remote" }

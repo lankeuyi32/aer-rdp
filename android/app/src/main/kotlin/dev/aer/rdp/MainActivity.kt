@@ -1,4 +1,4 @@
-package dev.aer.aer_rdp
+package dev.aer.rdp
 
 import io.flutter.embedding.android.FlutterActivity
 

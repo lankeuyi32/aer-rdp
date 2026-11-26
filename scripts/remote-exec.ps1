@@ -16,13 +16,25 @@ $sshOpts = @(
     "-o", "ServerAliveCountMax=4"
 )
 
+function ConvertTo-BashSingleQuoted {
+    param([string]$Value)
+    return "'" + $Value.Replace("'", "'\''") + "'"
+}
+
+$remoteDirQuoted = ConvertTo-BashSingleQuoted $cfg.RemoteDir
 $normalizedCmd = ($Command -replace "`r`n", "`n").Trim()
 $scriptBody = @"
 set -euo pipefail
 if [ -f "`$HOME/.aer-rdp-env.sh" ]; then
   . "`$HOME/.aer-rdp-env.sh"
 fi
-cd $($cfg.RemoteDir)
+REMOTE_DIR_RAW=$remoteDirQuoted
+case "`$REMOTE_DIR_RAW" in
+  "~") REMOTE_DIR="`$HOME" ;;
+  "~/"*) REMOTE_DIR="`$HOME/`${REMOTE_DIR_RAW#~/}" ;;
+  *) REMOTE_DIR="`$REMOTE_DIR_RAW" ;;
+esac
+cd "`$REMOTE_DIR"
 $normalizedCmd
 "@ -replace "`r`n", "`n"
 
