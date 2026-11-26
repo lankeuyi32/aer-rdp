@@ -1,10 +1,17 @@
 param(
     [switch]$IncludeGenerated,
-    [string]$OutputName = "aer-rdp-debug.apk"
+    [ValidateSet("debug", "release")]
+    [string]$Variant = "debug",
+    [string]$OutputName = ""
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($OutputName)) {
+    $OutputName = if ($Variant -eq "release") { "aer-rdp.apk" } else { "aer-rdp-debug.apk" }
+}
+$remoteApkName = "app-$Variant.apk"
 
 . (Join-Path $PSScriptRoot "_env.ps1")
 $cfg = Import-AerRdpEnv
@@ -53,10 +60,10 @@ ln -sfn "`$REMOTE_DIR" $remoteStageLinkQuoted
         throw "Failed to resolve remote directory '$($cfg.RemoteDir)' (exit $LASTEXITCODE)"
     }
 
-    Write-Host "Pulling installable APK from $($cfg.Target):$($cfg.RemoteDir)/build/app/outputs/flutter-apk/app-debug.apk -> $localApkPath ..."
-    & scp @sshOpts -P $cfg.Port -i $cfg.KeyPath "$($cfg.Target):$remoteStageLink/build/app/outputs/flutter-apk/app-debug.apk" $localApkPath
+    Write-Host "Pulling installable APK from $($cfg.Target):$($cfg.RemoteDir)/build/app/outputs/flutter-apk/$remoteApkName -> $localApkPath ..."
+    & scp @sshOpts -P $cfg.Port -i $cfg.KeyPath "$($cfg.Target):$remoteStageLink/build/app/outputs/flutter-apk/$remoteApkName" $localApkPath
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to pull app-debug.apk (exit $LASTEXITCODE)"
+        throw "Failed to pull $remoteApkName (exit $LASTEXITCODE)"
     }
 
     $apkInfo = Get-Item -LiteralPath $localApkPath

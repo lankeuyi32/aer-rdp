@@ -163,12 +163,16 @@ void main() {
         LogicalKeyboardKey.tab,
       ]);
 
+      final Offset center = tester.getCenter(find.byKey(AerKeys.sessionCanvas));
       final TestGesture pad = await tester.createGesture(
         kind: PointerDeviceKind.trackpad,
       );
-      await pad.addPointer(location: tester.getCenter(find.byKey(AerKeys.sessionCanvas)));
+      await pad.addPointer(location: center);
+      await pad.panZoomStart(center);
       await pad.moveBy(const Offset(40, 10));
+      await pad.panZoomEnd();
       await pad.removePointer();
+      await tester.pumpAndSettle();
 
       await tester.binding.setSurfaceSize(const Size(507, 768));
       await tester.pumpAndSettle();
