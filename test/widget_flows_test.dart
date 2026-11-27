@@ -7,7 +7,9 @@ import 'package:aer_rdp/services/cert_trust_store.dart';
 import 'package:aer_rdp/services/credential_vault.dart';
 import 'package:aer_rdp/services/demo_rdp_session_client.dart';
 import 'package:aer_rdp/services/profile_store.dart';
+import 'package:aer_rdp/services/quick_connect_history_store.dart';
 import 'package:aer_rdp/services/rdp_session_client.dart';
+import 'package:aer_rdp/services/saved_credential_store.dart';
 import 'package:aer_rdp/ui/aer_keys.dart';
 import 'package:aer_rdp/ui/connections/profile_form_dialog.dart';
 import 'package:flutter/services.dart';
@@ -422,6 +424,64 @@ void main() {
   });
 
   testWidgets(
+      'ProfileFormDialog supports custom FPS and custom bandwidth Mbps configuration',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    ProfileFormResult? result;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () async {
+                result = await showDialog<ProfileFormResult>(
+                  context: context,
+                  builder: (_) => const ProfileFormDialog(),
+                );
+              },
+              child: const Text('Add'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(AerKeys.profileFormHost), '10.0.0.88');
+    await tester.ensureVisible(find.text('120 FPS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('120 FPS'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('自定义带宽'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('自定义带宽'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(AerKeys.profileFormBandwidthMbps));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(AerKeys.profileFormBandwidthMbps),
+      '4',
+    );
+
+    await tester.tap(find.byKey(AerKeys.profileFormSave));
+    await tester.pumpAndSettle();
+
+    expect(result, isNotNull);
+    expect(result!.profile.displayConfig.targetFps, 120);
+    expect(result!.profile.displayConfig.bandwidthMode, BandwidthMode.custom);
+    expect(result!.profile.displayConfig.maxBandwidthMbps, 4);
+    expect(
+      result!.profile.displayConfig.effectiveProtocolBandwidth,
+      BandwidthMode.lowBandwidth,
+    );
+  });
+
+  testWidgets(
       'AerRdpApp surfaces SnackBar on post-mount unclean Disconnected without losing clean-disconnect behavior',
       (WidgetTester tester) async {
     final client = _DelayedAudioSessionClient();
@@ -503,6 +563,137 @@ void main() {
     expect(find.byKey(AerKeys.connectionCenterPage), findsOneWidget);
     expect(find.text('user initiated disconnect'), findsNothing);
     expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
+      'Small screen ProfileFormDialog stays compact (~70% height) with scrollable body, and Vault + Quick Connect history work end-to-end',
+      (WidgetTester tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final client = _DelayedAudioSessionClient();
+    final store = ProfileStore.inMemory();
+    final vault = CredentialVault.inMemory();
+    final trust = CertTrustStore.inMemory();
+    final savedCreds = SavedCredentialStore.inMemory();
+    final quickHistory = QuickConnectHistoryStore.inMemory();
+
+    await tester.pumpWidget(
+      AerRdpApp(
+        profileStore: store,
+        credentialVault: vault,
+        certTrustStore: trust,
+        savedCredentialStore: savedCreds,
+        quickConnectHistoryStore: quickHistory,
+        sessionClient: client,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Open Credential Vault and save one account credential + one secret key.
+    await tester.tap(find.byKey(AerKeys.credentialVaultButton));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AerKeys.credentialVaultDialog), findsOneWidget);
+
+    await tester.tap(find.byKey(AerKeys.credentialVaultAddButton));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(AerKeys.credentialFormName), '家里电脑账号');
+    await tester.enterText(find.byKey(AerKeys.credentialFormUser), 'lihao');
+    await tester.enterText(find.byKey(AerKeys.credentialFormDomain), 'HOME');
+    await tester.enterText(
+      find.byKey(AerKeys.credentialFormSecret),
+      'VaultPass#2026',
+    );
+    await tester.tap(find.byKey(AerKeys.credentialFormSaveButton));
+    await tester.pumpAndSettle();
+    expect(find.text('家里电脑账号'), findsOneWidget);
+
+    await tester.tap(find.byKey(AerKeys.credentialVaultAddButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('密钥/口令').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(AerKeys.credentialFormName), '恢复密钥');
+    await tester.enterText(
+      find.byKey(AerKeys.credentialFormSecret),
+      'RECOVERY-KEY-8899',
+    );
+    await tester.tap(find.byKey(AerKeys.credentialFormSaveButton));
+    await tester.pumpAndSettle();
+    expect(find.text('恢复密钥'), findsOneWidget);
+
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+
+    // 2. Open Add Profile on 360x640 small screen: dialog height must NOT fill screen.
+    await tester.tap(find.byKey(AerKeys.addProfileButton));
+    await tester.pumpAndSettle();
+    final dialogRect = tester.getRect(find.byKey(AerKeys.adaptiveDialogCard));
+    expect(
+      dialogRect.height,
+      lessThanOrEqualTo(640 * 0.72),
+      reason: 'Dialog must leave generous top/bottom margin on small screens',
+    );
+
+    // Select saved credential '家里电脑账号' and save profile.
+    await tester.enterText(find.byKey(AerKeys.profileFormHost), '10.0.0.142');
+    await tester.tap(find.text('家里电脑账号'));
+    await tester.pumpAndSettle();
+    // Save button stays pinned in footer without needing to scroll!
+    await tester.tap(find.byKey(AerKeys.profileFormSave));
+    await tester.pumpAndSettle();
+
+    expect(store.profiles, hasLength(1));
+    expect(store.profiles.single.credentialId, isNotNull);
+    expect(store.profiles.single.username, 'lihao');
+
+    // Connecting with vault-bound profile automatically injects VaultPass#2026.
+    await tester.tap(find.text('10.0.0.142'));
+    await tester.pump();
+    expect(client.lastRequest?.initialCredentials?.username, 'lihao');
+    expect(client.lastRequest?.initialCredentials?.domain, 'HOME');
+    expect(client.lastRequest?.initialCredentials?.password, 'VaultPass#2026');
+    client.controller.emit(
+      const SessionStateChangedEvent(
+        SessionState.disconnected(reason: 'done', clean: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 3. Quick Connect records history and allows 1-tap fill/reconnect next time.
+    client.resetController();
+    await tester.tap(find.byKey(AerKeys.quickConnectButton));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(AerKeys.profileFormHost), '192.168.50.8');
+    await tester.enterText(find.byKey(AerKeys.profileFormUser), 'quickuser');
+    await tester.enterText(find.byKey(AerKeys.profileFormPassword), 'QuickPw!');
+    await tester.tap(find.byKey(AerKeys.profileFormSave));
+    await tester.pumpAndSettle();
+
+    expect(quickHistory.entries, hasLength(1));
+    expect(quickHistory.entries.single.host, '192.168.50.8');
+    expect(client.lastRequest?.initialCredentials?.password, 'QuickPw!');
+    client.controller.emit(
+      const SessionStateChangedEvent(
+        SessionState.disconnected(reason: 'done', clean: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Reopen Quick Connect -> history row is shown and play icon reconnects with remembered password.
+    client.resetController();
+    await tester.tap(find.byKey(AerKeys.quickConnectButton));
+    await tester.pumpAndSettle();
+    expect(find.byKey(AerKeys.quickConnectHistorySection), findsOneWidget);
+    expect(find.text('192.168.50.8:3389'), findsOneWidget);
+    await tester.tap(find.byTooltip('直接连接'));
+    await tester.pumpAndSettle();
+    expect(client.lastRequest?.profile.host, '192.168.50.8');
+    expect(client.lastRequest?.initialCredentials?.username, 'quickuser');
+    expect(client.lastRequest?.initialCredentials?.password, 'QuickPw!');
   });
 }
 

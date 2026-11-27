@@ -1,6 +1,6 @@
-use ironrdp::graphics::image_processing::PixelFormat;
-use ironrdp::pdu::geometry::{InclusiveRectangle, Rectangle as _};
-use ironrdp::session::image::DecodedImage;
+use ironrdp_graphics::image_processing::PixelFormat;
+use ironrdp_pdu::geometry::{InclusiveRectangle, Rectangle as _};
+use ironrdp_session::image::DecodedImage;
 
 use crate::cert_sha256_hex;
 
@@ -96,6 +96,20 @@ impl Framebuffer {
         &mut self.image
     }
 
+    /// Synchronizes cached `(width, height)` if `ActiveStage::process` resized `DecodedImage`
+    /// in-place (for example via MS-RDPEGFX `RDPGFX_RESET_GRAPHICS_PDU`).
+    pub fn sync_dimensions_from_image(&mut self) -> Option<(u16, u16)> {
+        let img_w = self.image.width().max(1);
+        let img_h = self.image.height().max(1);
+        if self.width != img_w || self.height != img_h {
+            self.width = img_w;
+            self.height = img_h;
+            Some((img_w, img_h))
+        } else {
+            None
+        }
+    }
+
     pub fn data(&self) -> &[u8] {
         self.image.data()
     }
@@ -121,6 +135,87 @@ impl Framebuffer {
 
     pub fn sha256_hex(&self) -> String {
         cert_sha256_hex(self.image.data())
+    }
+}
+
+/// Lock-minimal front buffer holding only completed, tear-free RGBA frames for FFI readers.
+pub struct PublishedFramebuffer {
+    width: u16,
+    height: u16,
+    rgba: Vec<u8>,
+}
+
+impl PublishedFramebuffer {
+    pub fn new(width: u16, height: u16) -> Self {
+        let w = width.max(1);
+        let h = height.max(1);
+        Self {
+            width: w,
+            height: h,
+            rgba: vec![0u8; usize::from(w) * usize::from(h) * 4],
+        }
+    }
+
+    pub fn resize(&mut self, width: u16, height: u16) {
+        let w = width.max(1);
+        let h = height.max(1);
+        if self.width != w || self.height != h {
+            self.width = w;
+            self.height = h;
+            self.rgba.clear();
+            self.rgba.resize(usize::from(w) * usize::from(h) * 4, 0);
+        }
+    }
+
+    pub fn width(&self) -> u16 {
+        self.width
+    }
+
+    pub fn height(&self) -> u16 {
+        self.height
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.rgba
+    }
+
+    pub fn sha256_hex(&self) -> String {
+        cert_sha256_hex(&self.rgba)
+    }
+
+    pub fn commit_from(&mut self, src: &Framebuffer, dirty: DirtyRect) {
+        self.commit_rgba_slice(src.width(), src.height(), src.data(), dirty);
+    }
+
+    pub fn commit_rgba_slice(&mut self, fb_w: u16, fb_h: u16, src_data: &[u8], dirty: DirtyRect) {
+        let expected = usize::from(fb_w) * usize::from(fb_h) * 4;
+        if src_data.len() < expected {
+            return;
+        }
+        if self.width != fb_w || self.height != fb_h || self.rgba.len() != expected {
+            self.width = fb_w;
+            self.height = fb_h;
+            self.rgba.resize(expected, 0);
+            self.rgba.copy_from_slice(&src_data[..expected]);
+            return;
+        }
+        if dirty.x >= fb_w || dirty.y >= fb_h || dirty.w == 0 || dirty.h == 0 {
+            return;
+        }
+        let w = dirty.w.min(fb_w - dirty.x);
+        let h = dirty.h.min(fb_h - dirty.y);
+        if dirty.x == 0 && dirty.y == 0 && w == fb_w && h == fb_h {
+            self.rgba.copy_from_slice(&src_data[..expected]);
+            return;
+        }
+        let stride = usize::from(fb_w) * 4;
+        let row_bytes = usize::from(w) * 4;
+        let x_bytes = usize::from(dirty.x) * 4;
+        for row in 0..usize::from(h) {
+            let offset = (usize::from(dirty.y) + row) * stride + x_bytes;
+            self.rgba[offset..offset + row_bytes]
+                .copy_from_slice(&src_data[offset..offset + row_bytes]);
+        }
     }
 }
 
@@ -257,6 +352,33 @@ mod tests {
                 w: 1,
                 h: 1
             })
+        );
+    }
+
+    #[test]
+    fn published_framebuffer_commits_only_dirty_region_atomically() {
+        let src_bytes = [0xAA, 0xBB, 0xCC, 0xFF].repeat(8 * 8);
+        let mut pub_fb = PublishedFramebuffer::new(8, 8);
+        assert_eq!(&pub_fb.data()[0..4], &[0, 0, 0, 0]);
+
+        pub_fb.commit_rgba_slice(
+            8,
+            8,
+            &src_bytes,
+            DirtyRect {
+                x: 2,
+                y: 2,
+                w: 3,
+                h: 2,
+            },
+        );
+        // Outside dirty rect stays untouched (old frame preserved without tearing).
+        assert_eq!(&pub_fb.data()[0..4], &[0, 0, 0, 0]);
+        // Inside dirty rect (2, 2) is updated.
+        let inside_idx = (2 * 8 + 2) * 4;
+        assert_eq!(
+            &pub_fb.data()[inside_idx..inside_idx + 4],
+            &[0xAA, 0xBB, 0xCC, 0xFF]
         );
     }
 }

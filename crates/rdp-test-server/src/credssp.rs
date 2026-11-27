@@ -1,17 +1,19 @@
 use std::io;
 use std::sync::{Arc, Mutex};
 
-use ironrdp::connector::sspi::credssp::{
+use ironrdp_connector::sspi::credssp::{
     CredSspServer, CredentialsProxy, EarlyUserAuthResult, NStatusCode, ServerError, ServerMode,
     ServerState, TsRequest,
 };
-use ironrdp::connector::sspi::generator::GeneratorState;
-use ironrdp::connector::sspi::ntlm::NtlmConfig;
-use ironrdp::connector::sspi::{self, AuthIdentity, Secret, Username, UsernameParts};
-use ironrdp::connector::{ConnectorError, ConnectorErrorKind, ConnectorResult, ServerName, custom_err};
-use ironrdp::core::{WriteBuf, other_err};
-use ironrdp::pdu::PduHint;
-use ironrdp::pdu::nego::SecurityProtocol;
+use ironrdp_connector::sspi::generator::GeneratorState;
+use ironrdp_connector::sspi::ntlm::NtlmConfig;
+use ironrdp_connector::sspi::{self, AuthIdentity, Secret, Username, UsernameParts};
+use ironrdp_connector::{
+    ConnectorError, ConnectorErrorKind, ConnectorResult, ServerName, custom_err,
+};
+use ironrdp_core::{WriteBuf, other_err};
+use ironrdp_pdu::PduHint;
+use ironrdp_pdu::nego::SecurityProtocol;
 use ironrdp_tokio::{Framed, FramedRead, FramedWrite};
 use tracing::{debug, trace};
 
@@ -23,7 +25,7 @@ struct CredsspTsRequestHint;
 const CREDSSP_TS_REQUEST_HINT: CredsspTsRequestHint = CredsspTsRequestHint;
 
 impl PduHint for CredsspTsRequestHint {
-    fn find_size(&self, bytes: &[u8]) -> ironrdp::core::DecodeResult<Option<(bool, usize)>> {
+    fn find_size(&self, bytes: &[u8]) -> ironrdp_core::DecodeResult<Option<(bool, usize)>> {
         match TsRequest::read_length(bytes) {
             Ok(length) => Ok(Some((true, length))),
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(None),
@@ -143,7 +145,11 @@ where
             match process_res {
                 Ok(ServerState::ReplyNeeded(reply)) => {
                     buf.clear();
-                    let len = usize::from(reply.buffer_len());
+                    let len = usize::from(
+                        reply
+                            .buffer_len()
+                            .map_err(|e| custom_err!("TsRequest::buffer_len", e))?,
+                    );
                     let slice = buf.unfilled_to(len);
                     reply
                         .encode_ts_request(slice)
@@ -170,12 +176,14 @@ where
                         .map(|boxed| *boxed)
                         .unwrap_or_default();
                     err_req.error_code = Some(NStatusCode::LOGON_FAILURE);
-                    buf.clear();
-                    let len = usize::from(err_req.buffer_len());
-                    let slice = buf.unfilled_to(len);
-                    if err_req.encode_ts_request(slice).is_ok() {
-                        buf.advance(len);
-                        let _ = framed.write_all(buf.filled()).await;
+                    if let Ok(raw_len) = err_req.buffer_len() {
+                        buf.clear();
+                        let len = usize::from(raw_len);
+                        let slice = buf.unfilled_to(len);
+                        if err_req.encode_ts_request(slice).is_ok() {
+                            buf.advance(len);
+                            let _ = framed.write_all(buf.filled()).await;
+                        }
                     }
                     break Err(ConnectorError::new(
                         "CredSSP logon failure",

@@ -13,9 +13,9 @@ pub use audio::{AudioJitterBuffer, AudioStreamFormat};
 pub use framebuffer::{DirtyRect, Framebuffer};
 pub use session::{SessionHandle, connect};
 pub use types::{
-    AudioMode, AudioReadStats, AudioSyncStats, AuthCredentials, CertInfo, CertTrustDecision,
-    ConnectConfig, CoreError, SecurityMode, SessionCommand, SessionEvent, SessionState,
-    normalize_sha256_pin,
+    AudioMode, AudioReadStats, AudioSyncStats, AuthCredentials, BandwidthMode, CertInfo,
+    CertTrustDecision, ConnectConfig, CoreError, SecurityMode, SessionCommand, SessionEvent,
+    SessionState, normalize_sha256_pin,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,8 +74,8 @@ pub fn cert_sha256_hex(der_bytes: &[u8]) -> String {
 
 /// Verifies that Cohort A `ironrdp` (connector + rdpsnd + input) types link cleanly.
 pub fn supported_pcm_format_tag() -> u16 {
-    let fmt = ironrdp::rdpsnd::pdu::AudioFormat {
-        format: ironrdp::rdpsnd::pdu::WaveFormat::PCM,
+    let fmt = ironrdp_rdpsnd::pdu::AudioFormat {
+        format: ironrdp_rdpsnd::pdu::WaveFormat::PCM,
         n_channels: 2,
         n_samples_per_sec: 44_100,
         n_avg_bytes_per_sec: 176_400,
@@ -83,11 +83,16 @@ pub fn supported_pcm_format_tag() -> u16 {
         bits_per_sample: 16,
         data: None,
     };
-    if fmt.format == ironrdp::rdpsnd::pdu::WaveFormat::PCM {
+    if fmt.format == ironrdp_rdpsnd::pdu::WaveFormat::PCM {
         1
     } else {
         0
     }
+}
+
+/// Verifies that `ironrdp-egfx` with bundled OpenH264 (`AVC420` & `AVC444`) initializes cleanly.
+pub fn supports_egfx_h264() -> bool {
+    ironrdp_egfx::decode::OpenH264Decoder::new().is_ok()
 }
 
 /// Verifies `ironrdp-tokio` and `ironrdp-tls` compile and link cleanly with `rustls-ring`.
@@ -156,5 +161,10 @@ mod tests {
     #[test]
     fn tls_framed_type_resolves() {
         assert!(tls_framed_type_name().contains("Framed"));
+    }
+
+    #[test]
+    fn egfx_bundled_openh264_decoder_initializes() {
+        assert!(supports_egfx_h264());
     }
 }

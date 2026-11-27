@@ -2,9 +2,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use flutter_rust_bridge::frb;
 use rdp_core::{
-    AudioJitterBuffer, AudioMode, AuthCredentials, CertInfo, CertTrustDecision, ConnectConfig,
-    DirtyRect, EngineConfig, SecurityMode, SessionEvent, SessionHandle, SessionState,
-    cert_sha256_hex, connect, engine_info, supported_pcm_format_tag,
+    AudioJitterBuffer, AudioMode, AuthCredentials, BandwidthMode, CertInfo, CertTrustDecision,
+    ConnectConfig, DirtyRect, EngineConfig, SecurityMode, SessionEvent, SessionHandle,
+    SessionState, cert_sha256_hex, connect, engine_info, supported_pcm_format_tag,
 };
 
 use crate::frb_generated::StreamSink;
@@ -14,7 +14,7 @@ static TOKIO_RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
 fn runtime() -> &'static tokio::runtime::Runtime {
     TOKIO_RT.get_or_init(|| {
         tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
+            .worker_threads(4)
             .enable_all()
             .thread_name("aer-rdp-tokio")
             .build()
@@ -94,6 +94,23 @@ impl From<FfiAudioMode> for AudioMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FfiBandwidthMode {
+    Balanced,
+    HighQuality,
+    LowBandwidth,
+}
+
+impl From<FfiBandwidthMode> for BandwidthMode {
+    fn from(value: FfiBandwidthMode) -> Self {
+        match value {
+            FfiBandwidthMode::Balanced => BandwidthMode::Balanced,
+            FfiBandwidthMode::HighQuality => BandwidthMode::HighQuality,
+            FfiBandwidthMode::LowBandwidth => BandwidthMode::LowBandwidth,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FfiCertTrustDecision {
     TrustOnce,
     TrustAlways,
@@ -119,6 +136,7 @@ pub struct FfiConnectConfig {
     pub scale_factor: u32,
     pub security_mode: FfiSecurityMode,
     pub audio_mode: FfiAudioMode,
+    pub bandwidth_mode: FfiBandwidthMode,
     pub client_name: String,
     pub pinned_cert_sha256: Option<String>,
     pub enable_server_pointer: bool,
@@ -135,6 +153,7 @@ impl FfiConnectConfig {
             scale_factor: self.scale_factor,
             security_mode: self.security_mode.into(),
             audio_mode: self.audio_mode.into(),
+            bandwidth_mode: self.bandwidth_mode.into(),
             client_name: if self.client_name.trim().is_empty() {
                 "aer-rdp".to_owned()
             } else {
@@ -467,7 +486,7 @@ fn extract_frame_patch(
 
     let dirty_area = u64::from(w) * u64::from(h);
     let total_area = u64::from(fb_w) * u64::from(fb_h);
-    if (x == 0 && y == 0 && w == fb_w && h == fb_h) || dirty_area * 2 >= total_area {
+    if (x == 0 && y == 0 && w == fb_w && h == fb_h) || dirty_area * 5 >= total_area * 4 {
         return Some(FfiFramePatch {
             x: 0,
             y: 0,
@@ -524,7 +543,8 @@ fn read_audio_from_buffer(
         };
     }
 
-    let mut buf = vec![0u8; requested_frames as usize * frame_bytes];
+    let pull_frames = (requested_frames as usize).min(queued);
+    let mut buf = vec![0u8; pull_frames * frame_bytes];
     let stats = jb.read_pcm_frames(&mut buf, frames_played_since_last_read as usize);
     buf.truncate(stats.frames_read * frame_bytes);
     FfiAudioReadResult {
@@ -555,6 +575,12 @@ pub fn create_session(
 ) -> anyhow::Result<FfiSessionHandle> {
     let _guard = runtime().enter();
     let (handle, event_rx) = connect(config.to_core_config(), initial_creds.map(Into::into))?;
+    if let Ok(mut jb) = handle.audio_buffer().lock() {
+        // Real Windows 10/11 RDPSND/DVC streams batch 45-100ms WASAPI blocks alongside H.264 frames.
+        // Hand incoming blocks promptly (20ms prebuffer) into the native OS AudioTrack ringbuffer
+        // and allow up to 320ms burst absorption before emergency drift trimming.
+        jb.set_buffer_limits(20, 100, 320);
+    }
     Ok(FfiSessionHandle {
         inner: handle,
         pending_dirty: Arc::new(Mutex::new(None)),
@@ -753,6 +779,7 @@ mod tests {
             scale_factor: 150,
             security_mode: FfiSecurityMode::Nla,
             audio_mode: FfiAudioMode::Local,
+            bandwidth_mode: FfiBandwidthMode::HighQuality,
             client_name: "   ".into(),
             pinned_cert_sha256: Some("abcd".into()),
             enable_server_pointer: true,
@@ -766,6 +793,7 @@ mod tests {
         assert_eq!(core_cfg.scale_factor, 150);
         assert_eq!(core_cfg.security_mode, SecurityMode::Nla);
         assert_eq!(core_cfg.audio_mode, AudioMode::Local);
+        assert_eq!(core_cfg.bandwidth_mode, BandwidthMode::HighQuality);
         assert_eq!(core_cfg.client_name, "aer-rdp");
         assert_eq!(core_cfg.pinned_cert_sha256.as_deref(), Some("abcd"));
     }
@@ -835,7 +863,7 @@ mod tests {
         assert_eq!(patch.rgba_bytes.len(), 4 * 3 * 4);
         assert_eq!(&patch.rgba_bytes[0..4], &[2, 1, 0x55, 0xFF]);
 
-        let full = extract_frame_patch(
+        let sub_80 = extract_frame_patch(
             fb_w,
             fb_h,
             &data,
@@ -844,6 +872,22 @@ mod tests {
                 y: 0,
                 w: 8,
                 h: 8,
+            }),
+            false,
+        )
+        .unwrap();
+        assert!(!sub_80.is_full_frame);
+        assert_eq!(sub_80.rgba_bytes.len(), 8 * 8 * 4);
+
+        let full = extract_frame_patch(
+            fb_w,
+            fb_h,
+            &data,
+            Some(DirtyRect {
+                x: 0,
+                y: 0,
+                w: 9,
+                h: 9,
             }),
             false,
         )

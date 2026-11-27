@@ -46,6 +46,19 @@ class CertTrustStore extends ChangeNotifier {
     return _pins[endpointKey(host, port)];
   }
 
+  List<MapEntry<String, String>> get entries {
+    final list = _pins.entries.toList(growable: false);
+    list.sort((a, b) => a.key.compareTo(b.key));
+    return List<MapEntry<String, String>>.unmodifiable(list);
+  }
+
+  Future<void> removeEndpointKey(String normalizedEndpoint) async {
+    if (_pins.remove(normalizedEndpoint.toLowerCase()) != null) {
+      notifyListeners();
+      await _persist();
+    }
+  }
+
   Future<File?> _resolveStorageFile() async {
     if (_inMemoryOnly) return null;
     try {

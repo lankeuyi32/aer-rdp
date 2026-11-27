@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use ironrdp::core::{Decode as _, ReadCursor};
-use ironrdp::pdu::Action;
-use ironrdp::pdu::fast_path::{FastPathHeader, FastPathUpdatePdu, UpdateCode};
-use ironrdp::pdu::surface_commands::{FrameAction, SurfaceCommand};
-use ironrdp::session::{ActiveStage, ActiveStageBuilder, ActiveStageOutput};
-use ironrdp::svc::SvcProcessorMessages;
+use ironrdp_core::{Decode as _, ReadCursor};
+use ironrdp_dvc::DrdynvcClient;
+use ironrdp_pdu::Action;
+use ironrdp_pdu::fast_path::{FastPathHeader, FastPathUpdatePdu, UpdateCode};
+use ironrdp_pdu::surface_commands::{FrameAction, SurfaceCommand};
+use ironrdp_session::{ActiveStage, ActiveStageBuilder, ActiveStageOutput};
+use ironrdp_svc::SvcProcessorMessages;
 use ironrdp_tokio::FramedWrite;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{Notify, mpsc};
@@ -14,9 +15,9 @@ use tracing::{debug, trace, warn};
 
 use crate::audio::AudioJitterBuffer;
 use crate::connector::{ConnectedSession, connect_and_activate, run_deactivation_reactivation};
-use crate::framebuffer::{DirtyRect, Framebuffer};
+use crate::framebuffer::{DirtyRect, Framebuffer, PublishedFramebuffer};
 use crate::input::InputController;
-use crate::rdpsnd::AerRdpsndProcessor;
+use crate::rdpsnd::{ActiveAudioRoute, AerRdpsndProcessor};
 use crate::types::{
     AudioReadStats, AuthCredentials, CertInfo, CertTrustDecision, ConnectConfig, CoreError,
     SessionCommand, SessionEvent, SessionState,
@@ -25,7 +26,7 @@ use crate::types::{
 #[derive(Clone)]
 pub struct SessionHandle {
     cmd_tx: mpsc::UnboundedSender<SessionCommand>,
-    framebuffer: Arc<RwLock<Framebuffer>>,
+    framebuffer: Arc<RwLock<PublishedFramebuffer>>,
     audio_buffer: Arc<Mutex<AudioJitterBuffer>>,
     cert_info: Arc<RwLock<Option<CertInfo>>>,
 }
@@ -151,7 +152,7 @@ pub fn connect(
     let (aligned_w, clamped_h) = config.aligned_dimensions();
     let confirm_notify = Arc::new(Notify::new());
     let audio_buffer = Arc::new(Mutex::new(AudioJitterBuffer::new(Arc::clone(&confirm_notify))));
-    let framebuffer = Arc::new(RwLock::new(Framebuffer::new(aligned_w, clamped_h)));
+    let framebuffer = Arc::new(RwLock::new(PublishedFramebuffer::new(aligned_w, clamped_h)));
     let cert_info_slot = Arc::new(RwLock::new(None));
 
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
@@ -239,10 +240,63 @@ impl CursorTracker {
 }
 
 #[allow(clippy::too_many_arguments)]
+fn flush_staged_frame(
+    staged_dirty: &mut Option<DirtyRect>,
+    staged_deadline: &mut Option<tokio::time::Instant>,
+    decode_fb: &Framebuffer,
+    published_fb: &Arc<RwLock<PublishedFramebuffer>>,
+    event_tx: &mpsc::UnboundedSender<SessionEvent>,
+    session_start: Instant,
+    cur_width: u16,
+    cur_height: u16,
+    frame_sync: bool,
+) {
+    *staged_deadline = None;
+    let Some(d) = staged_dirty.take() else {
+        if frame_sync {
+            let presentation_ms = session_start.elapsed().as_millis() as u64;
+            let _ = event_tx.send(SessionEvent::FrameUpdated {
+                dirty_x: 0,
+                dirty_y: 0,
+                dirty_w: cur_width,
+                dirty_h: cur_height,
+                width: cur_width,
+                height: cur_height,
+                frame_sync: true,
+                presentation_ms,
+            });
+        }
+        return;
+    };
+
+    if let Ok(mut pub_guard) = published_fb.write() {
+        pub_guard.commit_from(decode_fb, d);
+    }
+    let presentation_ms = session_start.elapsed().as_millis() as u64;
+    let _ = event_tx.send(SessionEvent::FrameUpdated {
+        dirty_x: d.x,
+        dirty_y: d.y,
+        dirty_w: d.w,
+        dirty_h: d.h,
+        width: cur_width,
+        height: cur_height,
+        frame_sync,
+        presentation_ms,
+    });
+}
+
+async fn await_optional_instant(deadline: Option<tokio::time::Instant>) {
+    match deadline {
+        Some(ts) => tokio::time::sleep_until(ts).await,
+        None => std::future::pending().await,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn run_session_task(
     config: ConnectConfig,
     initial_creds: Option<AuthCredentials>,
-    framebuffer: Arc<RwLock<Framebuffer>>,
+    framebuffer: Arc<RwLock<PublishedFramebuffer>>,
     audio_buffer: Arc<Mutex<AudioJitterBuffer>>,
     confirm_notify: Arc<Notify>,
     cert_info_slot: Arc<RwLock<Option<CertInfo>>>,
@@ -255,6 +309,7 @@ async fn run_session_task(
         mut framed,
         mut connection_result,
         cert_info,
+        rdpsnd_core,
     } = match connect_and_activate(
         &config,
         initial_creds,
@@ -287,9 +342,10 @@ async fn run_session_task(
 
     let mut cur_width = connection_result.desktop_size.width;
     let mut cur_height = connection_result.desktop_size.height;
+    let mut decode_fb = Framebuffer::new(cur_width, cur_height);
     {
-        let mut fb = framebuffer.write().expect("framebuffer lock");
-        fb.resize(cur_width, cur_height);
+        let mut pub_fb = framebuffer.write().expect("framebuffer lock");
+        pub_fb.resize(cur_width, cur_height);
     }
 
     let mut input_ctrl = InputController::new(cur_width, cur_height);
@@ -316,25 +372,108 @@ async fn run_session_task(
         height: cur_height,
     }));
 
+    let mut staged_dirty: Option<DirtyRect> = None;
+    let mut staged_deadline: Option<tokio::time::Instant> = None;
+    let mut has_frame_markers = false;
+    let mut deferred_cmd: Option<SessionCommand> = None;
+
     loop {
         tokio::select! {
+            biased;
+
+            _ = confirm_notify.notified() => {
+                let confirms = {
+                    let mut jb = audio_buffer.lock().expect("audio_buffer lock");
+                    jb.drain_ready_confirms()
+                };
+                if !confirms.is_empty() {
+                    let count = confirms.len() as u64;
+                    let route = rdpsnd_core
+                        .as_ref()
+                        .and_then(|c| c.lock().ok().map(|g| g.active_route()))
+                        .unwrap_or_default();
+
+                    let encoded_res = match route {
+                        ActiveAudioRoute::StaticSvc => {
+                            let svc_msgs = SvcProcessorMessages::<AerRdpsndProcessor>::new(
+                                AerRdpsndProcessor::wrap_wave_confirms(confirms),
+                            );
+                            active_stage
+                                .process_svc_processor_messages(svc_msgs)
+                                .map_err(|e| e.to_string())
+                        }
+                        ActiveAudioRoute::Dvc { channel_id } => {
+                            AerRdpsndProcessor::wrap_dvc_wave_confirms(channel_id, confirms)
+                                .map_err(|e| e.to_string())
+                                .and_then(|svc_msgs| {
+                                    active_stage
+                                        .process_svc_processor_messages(
+                                            SvcProcessorMessages::<DrdynvcClient>::new(svc_msgs),
+                                        )
+                                        .map_err(|e| e.to_string())
+                                })
+                        }
+                    };
+
+                    match encoded_res {
+                        Ok(bytes) => {
+                            trace!(count, ?route, bytes_len = bytes.len(), "sending playout-paced SNDC_WAVECONFIRM");
+                            if let Err(err) = framed.write_all(&bytes).await {
+                                warn!(error = %err, "failed writing WaveConfirm");
+                            } else if let Ok(mut jb) = audio_buffer.lock() {
+                                jb.mark_confirms_sent(count);
+                            }
+                        }
+                        Err(err) => {
+                            warn!(error = %err, ?route, "failed encoding WaveConfirm");
+                        }
+                    }
+                }
+            }
+
             pdu_res = framed.read_pdu() => {
                 match pdu_res {
                     Ok((action, frame)) => {
-                        let frame_sync = if action == Action::FastPath {
+                        let prescan_sync = if action == Action::FastPath {
                             scan_fastpath_frame_sync(&frame)
                         } else {
                             false
                         };
 
-                        let outputs = {
-                            let mut fb = framebuffer.write().expect("framebuffer lock");
-                            active_stage.process(fb.image_mut(), action, &frame)
-                        };
+                        let outputs =
+                            active_stage.process(decode_fb.image_mut(), action, &frame, None);
+
+                        if let Some((new_w, new_h)) = decode_fb.sync_dimensions_from_image() {
+                            cur_width = new_w;
+                            cur_height = new_h;
+                            staged_dirty = None;
+                            staged_deadline = None;
+                            if let Ok(mut pub_fb) = framebuffer.write() {
+                                pub_fb.resize(new_w, new_h);
+                            }
+                            input_ctrl.set_desktop_size(new_w, new_h);
+                            let _ = event_tx.send(SessionEvent::SessionStateChanged(
+                                SessionState::Active {
+                                    width: cur_width,
+                                    height: cur_height,
+                                },
+                            ));
+                        }
 
                         let outputs = match outputs {
                             Ok(o) => o,
                             Err(err) => {
+                                flush_staged_frame(
+                                    &mut staged_dirty,
+                                    &mut staged_deadline,
+                                    &decode_fb,
+                                    &framebuffer,
+                                    &event_tx,
+                                    session_start,
+                                    cur_width,
+                                    cur_height,
+                                    false,
+                                );
                                 let _ = event_tx.send(SessionEvent::SessionStateChanged(
                                     SessionState::Disconnected {
                                         reason: err.to_string(),
@@ -345,25 +484,29 @@ async fn run_session_task(
                             }
                         };
 
-                        let mut dirty_union: Option<DirtyRect> = None;
                         let mut terminate_reason: Option<String> = None;
                         let mut do_deactivate = false;
+                        let mut saw_fastpath_frame_ack = false;
+                        let mut saw_graphics_in_pdu = false;
 
                         for out in outputs {
                             match out {
                                 ActiveStageOutput::ResponseFrame(bytes) => {
-                                    if let Err(err) = framed.write_all(&bytes).await {
-                                        terminate_reason = Some(err.to_string());
-                                        break;
+                                    if !bytes.is_empty() {
+                                        if action == Action::FastPath {
+                                            saw_fastpath_frame_ack = true;
+                                            has_frame_markers = true;
+                                        }
+                                        if let Err(err) = framed.write_all(&bytes).await {
+                                            terminate_reason = Some(err.to_string());
+                                            break;
+                                        }
                                     }
                                 }
                                 ActiveStageOutput::GraphicsUpdate(rect) => {
-                                    let clamped = {
-                                        let fb = framebuffer.read().expect("framebuffer lock");
-                                        fb.clamp_rect(&rect)
-                                    };
-                                    if let Some(d) = clamped {
-                                        dirty_union = Some(match dirty_union {
+                                    if let Some(d) = decode_fb.clamp_rect(&rect) {
+                                        saw_graphics_in_pdu = true;
+                                        staged_dirty = Some(match staged_dirty {
                                             Some(prev) => prev.union(d),
                                             None => d,
                                         });
@@ -400,32 +543,43 @@ async fn run_session_task(
                                 ActiveStageOutput::Terminate(reason) => {
                                     terminate_reason = Some(reason.description());
                                 }
-                                ActiveStageOutput::MultitransportRequest(_)
-                                | ActiveStageOutput::AutoDetect(_) => {}
+                                _ => {}
                             }
                         }
 
-                        if dirty_union.is_some() || frame_sync {
-                            let d = dirty_union.unwrap_or(DirtyRect {
-                                x: 0,
-                                y: 0,
-                                w: cur_width,
-                                h: cur_height,
-                            });
-                            let presentation_ms = session_start.elapsed().as_millis() as u64;
-                            let _ = event_tx.send(SessionEvent::FrameUpdated {
-                                dirty_x: d.x,
-                                dirty_y: d.y,
-                                dirty_w: d.w,
-                                dirty_h: d.h,
-                                width: cur_width,
-                                height: cur_height,
-                                frame_sync,
-                                presentation_ms,
-                            });
+                        let frame_complete = prescan_sync
+                            || saw_fastpath_frame_ack
+                            || (action == Action::X224 && saw_graphics_in_pdu);
+                        if frame_complete {
+                            flush_staged_frame(
+                                &mut staged_dirty,
+                                &mut staged_deadline,
+                                &decode_fb,
+                                &framebuffer,
+                                &event_tx,
+                                session_start,
+                                cur_width,
+                                cur_height,
+                                prescan_sync || saw_fastpath_frame_ack,
+                            );
+                        } else if staged_dirty.is_some() && staged_deadline.is_none() {
+                            let hold_ms = if has_frame_markers { 80 } else { 4 };
+                            staged_deadline =
+                                Some(tokio::time::Instant::now() + Duration::from_millis(hold_ms));
                         }
 
                         if let Some(reason) = terminate_reason {
+                            flush_staged_frame(
+                                &mut staged_dirty,
+                                &mut staged_deadline,
+                                &decode_fb,
+                                &framebuffer,
+                                &event_tx,
+                                session_start,
+                                cur_width,
+                                cur_height,
+                                false,
+                            );
                             let (mut stream, _) = framed.into_inner();
                             let _ = stream.shutdown().await;
                             let _ = event_tx.send(SessionEvent::SessionStateChanged(
@@ -435,6 +589,18 @@ async fn run_session_task(
                         }
 
                         if do_deactivate {
+                            flush_staged_frame(
+                                &mut staged_dirty,
+                                &mut staged_deadline,
+                                &decode_fb,
+                                &framebuffer,
+                                &event_tx,
+                                session_start,
+                                cur_width,
+                                cur_height,
+                                false,
+                            );
+                            has_frame_markers = false;
                             let _ = event_tx.send(SessionEvent::SessionStateChanged(
                                 SessionState::Reactivating,
                             ));
@@ -449,8 +615,10 @@ async fn run_session_task(
                                     if new_w != cur_width || new_h != cur_height {
                                         cur_width = new_w;
                                         cur_height = new_h;
-                                        let mut fb = framebuffer.write().expect("framebuffer lock");
-                                        fb.resize(new_w, new_h);
+                                        decode_fb.resize(new_w, new_h);
+                                        let mut pub_fb =
+                                            framebuffer.write().expect("framebuffer lock");
+                                        pub_fb.resize(new_w, new_h);
                                         input_ctrl.set_desktop_size(new_w, new_h);
                                     }
                                     let _ = event_tx.send(SessionEvent::SessionStateChanged(
@@ -475,6 +643,17 @@ async fn run_session_task(
                         }
                     }
                     Err(err) => {
+                        flush_staged_frame(
+                            &mut staged_dirty,
+                            &mut staged_deadline,
+                            &decode_fb,
+                            &framebuffer,
+                            &event_tx,
+                            session_start,
+                            cur_width,
+                            cur_height,
+                            false,
+                        );
                         debug!(error = %err, "socket read ended");
                         let _ = event_tx.send(SessionEvent::SessionStateChanged(
                             SessionState::Disconnected {
@@ -487,19 +666,48 @@ async fn run_session_task(
                 }
             }
 
-            cmd = cmd_rx.recv() => {
+            cmd = async {
+                if let Some(c) = deferred_cmd.take() {
+                    Some(c)
+                } else {
+                    cmd_rx.recv().await
+                }
+            } => {
                 let Some(cmd) = cmd else {
                     break;
                 };
                 match cmd {
                     SessionCommand::SendPointer {
-                        x,
-                        y,
+                        mut x,
+                        mut y,
                         button_mask,
                         down,
                         wheel_delta_v,
                         wheel_delta_h,
                     } => {
+                        // Coalesce queued pure pointer-move/drag updates with identical button state
+                        // so 240Hz touch drags never lag behind the user's finger.
+                        if wheel_delta_v == 0 && wheel_delta_h == 0 {
+                            while let Ok(next_cmd) = cmd_rx.try_recv() {
+                                match next_cmd {
+                                    SessionCommand::SendPointer {
+                                        x: nx,
+                                        y: ny,
+                                        button_mask: nmask,
+                                        down: ndown,
+                                        wheel_delta_v: 0,
+                                        wheel_delta_h: 0,
+                                    } if nmask == button_mask && ndown == down => {
+                                        x = nx;
+                                        y = ny;
+                                    }
+                                    other => {
+                                        deferred_cmd = Some(other);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                         let events = input_ctrl.pointer_events(
                             x,
                             y,
@@ -509,7 +717,7 @@ async fn run_session_task(
                             wheel_delta_h,
                         );
                         if !events.is_empty()
-                            && let Err(err) = send_fastpath_input(&mut active_stage, &framebuffer, &mut framed, &events).await
+                            && let Err(err) = send_fastpath_input(&mut active_stage, &mut decode_fb, &mut framed, &events).await
                         {
                             warn!(error = %err, "failed to send pointer input");
                         }
@@ -517,7 +725,7 @@ async fn run_session_task(
                     SessionCommand::SendScancode { code, extended, down } => {
                         let events = input_ctrl.scancode_events(code, extended, down);
                         if !events.is_empty()
-                            && let Err(err) = send_fastpath_input(&mut active_stage, &framebuffer, &mut framed, &events).await
+                            && let Err(err) = send_fastpath_input(&mut active_stage, &mut decode_fb, &mut framed, &events).await
                         {
                             warn!(error = %err, "failed to send scancode input");
                         }
@@ -525,7 +733,7 @@ async fn run_session_task(
                     SessionCommand::SendUnicode { code_unit, down } => {
                         let events = input_ctrl.unicode_events(code_unit, down);
                         if !events.is_empty()
-                            && let Err(err) = send_fastpath_input(&mut active_stage, &framebuffer, &mut framed, &events).await
+                            && let Err(err) = send_fastpath_input(&mut active_stage, &mut decode_fb, &mut framed, &events).await
                         {
                             warn!(error = %err, "failed to send unicode input");
                         }
@@ -541,9 +749,20 @@ async fn run_session_task(
                         }
                     }
                     SessionCommand::Disconnect => {
+                        flush_staged_frame(
+                            &mut staged_dirty,
+                            &mut staged_deadline,
+                            &decode_fb,
+                            &framebuffer,
+                            &event_tx,
+                            session_start,
+                            cur_width,
+                            cur_height,
+                            false,
+                        );
                         let released = input_ctrl.release_all();
                         if !released.is_empty() {
-                            let _ = send_fastpath_input(&mut active_stage, &framebuffer, &mut framed, &released).await;
+                            let _ = send_fastpath_input(&mut active_stage, &mut decode_fb, &mut framed, &released).await;
                         }
 
                         if let Ok(outputs) = active_stage.graceful_shutdown() {
@@ -564,10 +783,12 @@ async fn run_session_task(
                                 pdu = framed.read_pdu() => {
                                     match pdu {
                                         Ok((action, frame)) => {
-                                    let res = {
-                                        let mut fb = framebuffer.write().expect("framebuffer lock");
-                                        active_stage.process(fb.image_mut(), action, &frame)
-                                    };
+                                    let res = active_stage.process(
+                                        decode_fb.image_mut(),
+                                        action,
+                                        &frame,
+                                        None,
+                                    );
                                     if let Ok(outs) = res {
                                         let mut done = false;
                                         for o in outs {
@@ -608,30 +829,18 @@ async fn run_session_task(
                 }
             }
 
-            _ = confirm_notify.notified() => {
-                let confirms = {
-                    let mut jb = audio_buffer.lock().expect("audio_buffer lock");
-                    jb.drain_ready_confirms()
-                };
-                if !confirms.is_empty() {
-                    let count = confirms.len() as u64;
-                    let svc_msgs = SvcProcessorMessages::<AerRdpsndProcessor>::new(
-                        AerRdpsndProcessor::wrap_wave_confirms(confirms),
-                    );
-                    match active_stage.process_svc_processor_messages(svc_msgs) {
-                        Ok(bytes) => {
-                            trace!(count, bytes_len = bytes.len(), "sending playout-paced SNDC_WAVECONFIRM");
-                            if let Err(err) = framed.write_all(&bytes).await {
-                                warn!(error = %err, "failed writing WaveConfirm");
-                            } else if let Ok(mut jb) = audio_buffer.lock() {
-                                jb.mark_confirms_sent(count);
-                            }
-                        }
-                        Err(err) => {
-                            warn!(error = %err, "failed encoding WaveConfirm");
-                        }
-                    }
-                }
+            _ = await_optional_instant(staged_deadline), if staged_deadline.is_some() => {
+                flush_staged_frame(
+                    &mut staged_dirty,
+                    &mut staged_deadline,
+                    &decode_fb,
+                    &framebuffer,
+                    &event_tx,
+                    session_start,
+                    cur_width,
+                    cur_height,
+                    false,
+                );
             }
         }
     }
@@ -639,16 +848,13 @@ async fn run_session_task(
 
 async fn send_fastpath_input(
     active_stage: &mut ActiveStage,
-    framebuffer: &Arc<RwLock<Framebuffer>>,
+    decode_fb: &mut Framebuffer,
     framed: &mut ironrdp_tokio::TokioFramed<ironrdp_tls::TlsStream<tokio::net::TcpStream>>,
-    events: &[ironrdp::pdu::input::fast_path::FastPathInputEvent],
+    events: &[ironrdp_pdu::input::fast_path::FastPathInputEvent],
 ) -> Result<(), CoreError> {
-    let outs = {
-        let mut fb = framebuffer.write().expect("framebuffer lock");
-        active_stage
-            .process_fastpath_input(fb.image_mut(), events)
-            .map_err(|e| CoreError::Session(e.to_string()))?
-    };
+    let outs = active_stage
+        .process_fastpath_input(decode_fb.image_mut(), events)
+        .map_err(|e| CoreError::Session(e.to_string()))?;
     for out in outs {
         if let ActiveStageOutput::ResponseFrame(bytes) = out {
             framed.write_all(&bytes).await?;
@@ -660,8 +866,8 @@ async fn send_fastpath_input(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ironrdp::core::encode_vec;
-    use ironrdp::pdu::fast_path::{EncryptionFlags, Fragmentation};
+    use ironrdp_core::encode_vec;
+    use ironrdp_pdu::fast_path::{EncryptionFlags, Fragmentation};
 
     #[test]
     fn fastpath_sync_prescan_detects_synchronize_update_code() {

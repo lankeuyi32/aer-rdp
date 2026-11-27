@@ -1,0 +1,92 @@
+name: Build iPadOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "lib/**"
+      - "crates/**"
+      - "ios/**"
+      - "pubspec.yaml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/build-ipa.yml"
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-ipa:
+    name: Build Unsigned IPA (iPadOS / iOS arm64)
+    runs-on: macos-15
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Install Rust toolchain (aarch64-apple-ios)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ios-arm64
+
+      - name: Precheck Rust FFI static library for iOS arm64
+        run: |
+          cargo build --locked --release --target aarch64-apple-ios -p rdp-ffi
+          ls -lh target/aarch64-apple-ios/release/librdp_ffi.a
+
+      - name: Setup Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dart & CocoaPods dependencies
+        run: |
+          flutter --version
+          flutter pub get
+          flutter build ios --release --no-codesign --config-only
+          (cd ios && pod install)
+
+      - name: Run Flutter static analysis & unit tests
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Build unsigned iOS / iPadOS Runner.app
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package sideload-ready IPA (Sideloadly / SideStore / AltStore)
+        run: |
+          test -d build/ios/iphoneos/Runner.app
+          rm -rf Payload aer-rdp-ipad.ipa
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/Runner.app
+          ditto -c -k --sequesterRsrc --keepParent Payload aer-rdp-ipad.ipa
+          ls -lh aer-rdp-ipad.ipa
+
+      - name: Upload aer-rdp-ipad.ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aer-rdp-ipad-ipa
+          path: aer-rdp-ipad.ipa
+          if-no-files-found: error
+          retention-days: 30

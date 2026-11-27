@@ -55,6 +55,7 @@ class ConnectRequest {
     this.effectiveWidth = 1280,
     this.effectiveHeight = 720,
     this.effectiveScaleFactor = 100,
+    this.effectiveBandwidthMode,
     this.clientName = 'aer-rdp',
   });
 
@@ -64,7 +65,11 @@ class ConnectRequest {
   final int effectiveWidth;
   final int effectiveHeight;
   final int effectiveScaleFactor;
+  final BandwidthMode? effectiveBandwidthMode;
   final String clientName;
+
+  BandwidthMode get resolvedBandwidthMode =>
+      effectiveBandwidthMode ?? profile.displayConfig.effectiveProtocolBandwidth;
 }
 
 enum SessionPhase {

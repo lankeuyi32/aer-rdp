@@ -980,6 +980,19 @@ impl SseDecode for crate::api::FfiAudioReadResult {
     }
 }
 
+impl SseDecode for crate::api::FfiBandwidthMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::FfiBandwidthMode::Balanced,
+            1 => crate::api::FfiBandwidthMode::HighQuality,
+            2 => crate::api::FfiBandwidthMode::LowBandwidth,
+            _ => unreachable!("Invalid variant for FfiBandwidthMode: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::FfiCertInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1025,6 +1038,7 @@ impl SseDecode for crate::api::FfiConnectConfig {
         let mut var_scaleFactor = <u32>::sse_decode(deserializer);
         let mut var_securityMode = <crate::api::FfiSecurityMode>::sse_decode(deserializer);
         let mut var_audioMode = <crate::api::FfiAudioMode>::sse_decode(deserializer);
+        let mut var_bandwidthMode = <crate::api::FfiBandwidthMode>::sse_decode(deserializer);
         let mut var_clientName = <String>::sse_decode(deserializer);
         let mut var_pinnedCertSha256 = <Option<String>>::sse_decode(deserializer);
         let mut var_enableServerPointer = <bool>::sse_decode(deserializer);
@@ -1037,6 +1051,7 @@ impl SseDecode for crate::api::FfiConnectConfig {
             scale_factor: var_scaleFactor,
             security_mode: var_securityMode,
             audio_mode: var_audioMode,
+            bandwidth_mode: var_bandwidthMode,
             client_name: var_clientName,
             pinned_cert_sha256: var_pinnedCertSha256,
             enable_server_pointer: var_enableServerPointer,
@@ -1483,6 +1498,25 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::FfiAudioReadResult>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::FfiBandwidthMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Balanced => 0.into_dart(),
+            Self::HighQuality => 1.into_dart(),
+            Self::LowBandwidth => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::FfiBandwidthMode {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::FfiBandwidthMode>
+    for crate::api::FfiBandwidthMode
+{
+    fn into_into_dart(self) -> crate::api::FfiBandwidthMode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::FfiCertInfo {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -1536,6 +1570,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::FfiConnectConfig {
             self.scale_factor.into_into_dart().into_dart(),
             self.security_mode.into_into_dart().into_dart(),
             self.audio_mode.into_into_dart().into_dart(),
+            self.bandwidth_mode.into_into_dart().into_dart(),
             self.client_name.into_into_dart().into_dart(),
             self.pinned_cert_sha256.into_into_dart().into_dart(),
             self.enable_server_pointer.into_into_dart().into_dart(),
@@ -1828,6 +1863,23 @@ impl SseEncode for crate::api::FfiAudioReadResult {
     }
 }
 
+impl SseEncode for crate::api::FfiBandwidthMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::FfiBandwidthMode::Balanced => 0,
+                crate::api::FfiBandwidthMode::HighQuality => 1,
+                crate::api::FfiBandwidthMode::LowBandwidth => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for crate::api::FfiCertInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1868,6 +1920,7 @@ impl SseEncode for crate::api::FfiConnectConfig {
         <u32>::sse_encode(self.scale_factor, serializer);
         <crate::api::FfiSecurityMode>::sse_encode(self.security_mode, serializer);
         <crate::api::FfiAudioMode>::sse_encode(self.audio_mode, serializer);
+        <crate::api::FfiBandwidthMode>::sse_encode(self.bandwidth_mode, serializer);
         <String>::sse_encode(self.client_name, serializer);
         <Option<String>>::sse_encode(self.pinned_cert_sha256, serializer);
         <bool>::sse_encode(self.enable_server_pointer, serializer);

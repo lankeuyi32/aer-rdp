@@ -13,6 +13,32 @@ abstract final class AerKeys {
       ValueKey<String>('import_profiles_button');
   static const ValueKey<String> exportProfilesButton =
       ValueKey<String>('export_profiles_button');
+  static const ValueKey<String> credentialVaultButton =
+      ValueKey<String>('credential_vault_button');
+  static const ValueKey<String> adaptiveDialogCard =
+      ValueKey<String>('adaptive_dialog_card');
+  static const ValueKey<String> credentialVaultDialog =
+      ValueKey<String>('credential_vault_dialog');
+  static const ValueKey<String> credentialVaultAddButton =
+      ValueKey<String>('credential_vault_add_button');
+  static const ValueKey<String> credentialFormName =
+      ValueKey<String>('credential_form_name');
+  static const ValueKey<String> credentialFormUser =
+      ValueKey<String>('credential_form_user');
+  static const ValueKey<String> credentialFormDomain =
+      ValueKey<String>('credential_form_domain');
+  static const ValueKey<String> credentialFormSecret =
+      ValueKey<String>('credential_form_secret');
+  static const ValueKey<String> credentialFormNote =
+      ValueKey<String>('credential_form_note');
+  static const ValueKey<String> credentialFormSaveButton =
+      ValueKey<String>('credential_form_save_button');
+  static const ValueKey<String> profileFormCredentialSelector =
+      ValueKey<String>('profile_form_credential_selector');
+  static const ValueKey<String> quickConnectHistorySection =
+      ValueKey<String>('quick_connect_history_section');
+  static const ValueKey<String> quickConnectRememberPassword =
+      ValueKey<String>('quick_connect_remember_password');
 
   static const ValueKey<String> profileFormName =
       ValueKey<String>('profile_form_name');
@@ -32,6 +58,14 @@ abstract final class AerKeys {
       ValueKey<String>('profile_form_audio');
   static const ValueKey<String> profileFormInputMode =
       ValueKey<String>('profile_form_input_mode');
+  static const ValueKey<String> profileFormFps =
+      ValueKey<String>('profile_form_fps');
+  static const ValueKey<String> profileFormBandwidth =
+      ValueKey<String>('profile_form_bandwidth');
+  static const ValueKey<String> profileFormBandwidthMbps =
+      ValueKey<String>('profile_form_bandwidth_mbps');
+  static const ValueKey<String> profileFormCustomFps =
+      ValueKey<String>('profile_form_custom_fps');
   static const ValueKey<String> profileFormSave =
       ValueKey<String>('profile_form_save');
 
@@ -64,4 +98,10 @@ abstract final class AerKeys {
       ValueKey<String>('command_bar_zoom_reset');
   static const ValueKey<String> specialKeyBar =
       ValueKey<String>('special_key_bar');
+  static const ValueKey<String> specialKeyBarKeyboardToggle =
+      ValueKey<String>('special_key_bar_keyboard_toggle');
+  static const ValueKey<String> specialKeyBarExpandToggle =
+      ValueKey<String>('special_key_bar_expand_toggle');
+  static const ValueKey<String> specialKeyBarExpandedPanel =
+      ValueKey<String>('special_key_bar_expanded_panel');
 }

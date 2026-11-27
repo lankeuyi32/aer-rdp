@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use ironrdp::pdu::rdp::server_error_info::ErrorInfo;
+use ironrdp_pdu::rdp::server_error_info::ErrorInfo;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, oneshot};
@@ -36,20 +36,20 @@ impl Default for TestServerConfig {
 }
 
 impl TestServerConfig {
-    pub fn desktop_size(&self) -> ironrdp_server::DesktopSize {
-        ironrdp_server::DesktopSize {
+    pub fn desktop_size(&self) -> ironrdp_acceptor::DesktopSize {
+        ironrdp_acceptor::DesktopSize {
             width: self.desktop_width,
             height: self.desktop_height,
         }
     }
 }
 
-pub fn default_desktop_size() -> ironrdp_server::DesktopSize {
+pub fn default_desktop_size() -> ironrdp_acceptor::DesktopSize {
     TestServerConfig::default().desktop_size()
 }
 
-pub fn default_platform_type() -> ironrdp::pdu::rdp::capability_sets::MajorPlatformType {
-    ironrdp::pdu::rdp::capability_sets::MajorPlatformType::WINDOWS
+pub fn default_platform_type() -> ironrdp_pdu::rdp::capability_sets::MajorPlatformType {
+    ironrdp_pdu::rdp::capability_sets::MajorPlatformType::WINDOWS
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -467,7 +467,7 @@ mod tests {
     fn default_platform_is_windows() {
         assert_eq!(
             default_platform_type(),
-            ironrdp::pdu::rdp::capability_sets::MajorPlatformType::WINDOWS
+            ironrdp_pdu::rdp::capability_sets::MajorPlatformType::WINDOWS
         );
     }
 

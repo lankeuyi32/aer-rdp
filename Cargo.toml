@@ -28,8 +28,19 @@ tracing = "0.1"
 x509-cert = "0.2"
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
-ironrdp = { version = "0.17.0", default-features = false, features = ["core", "pdu", "connector", "session", "graphics", "input", "svc", "rdpsnd"] }
-ironrdp-acceptor = "0.10.0"
-ironrdp-tokio = "0.10.0"
-ironrdp-tls = { version = "0.2.2", default-features = false, features = ["rustls-ring"] }
-ironrdp-server = { version = "0.13.0", default-features = false, features = ["helper"] }
+ironrdp-core = "0.3"
+ironrdp-pdu = "0.11"
+ironrdp-connector = "0.12"
+ironrdp-session = "0.13"
+ironrdp-egfx = { version = "0.5", features = ["openh264-bundled"] }
+ironrdp-graphics = "0.11"
+ironrdp-input = "0.9"
+ironrdp-svc = "0.10"
+ironrdp-dvc = "0.10"
+ironrdp-rdpdr = "0.9"
+ironrdp-rdpsnd = "0.11"
+ironrdp-displaycontrol = "0.10"
+ironrdp-echo = "0.6"
+ironrdp-acceptor = "0.12"
+ironrdp-tokio = "0.12"
+ironrdp-tls = { version = "0.3", default-features = false, features = ["rustls-ring"] }

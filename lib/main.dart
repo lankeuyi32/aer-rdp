@@ -3,17 +3,21 @@ import 'dart:async';
 import 'package:aer_rdp/src/rust/api.dart';
 import 'package:aer_rdp/src/rust/frb_generated.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'models/connection_profile.dart';
+import 'models/saved_credential.dart';
 import 'models/session_models.dart';
 import 'services/cert_trust_store.dart';
 import 'services/credential_vault.dart';
 import 'services/demo_rdp_session_client.dart';
 import 'services/profile_store.dart';
+import 'services/quick_connect_history_store.dart';
 import 'services/rdp_session_client.dart';
 import 'services/rust_rdp_session_client.dart';
+import 'services/saved_credential_store.dart';
 import 'ui/connections/connection_center_page.dart';
 import 'ui/session/auth_prompt_dialog.dart';
 import 'ui/session/cert_trust_dialog.dart';
@@ -40,6 +44,8 @@ class AerRdpApp extends StatefulWidget {
     this.profileStore,
     this.credentialVault,
     this.certTrustStore,
+    this.savedCredentialStore,
+    this.quickConnectHistoryStore,
   });
 
   final String engineStatus;
@@ -47,6 +53,8 @@ class AerRdpApp extends StatefulWidget {
   final ProfileStore? profileStore;
   final CredentialVault? credentialVault;
   final CertTrustStore? certTrustStore;
+  final SavedCredentialStore? savedCredentialStore;
+  final QuickConnectHistoryStore? quickConnectHistoryStore;
 
   @override
   State<AerRdpApp> createState() => _AerRdpAppState();
@@ -60,6 +68,8 @@ class _AerRdpAppState extends State<AerRdpApp> {
   late final ProfileStore _profileStore;
   late final CredentialVault _credentialVault;
   late final CertTrustStore _certTrustStore;
+  late final SavedCredentialStore _savedCredentialStore;
+  late final QuickConnectHistoryStore _quickConnectHistoryStore;
   late final RdpSessionClient _sessionClient;
 
   ConnectionProfile? _activeProfile;
@@ -86,9 +96,15 @@ class _AerRdpAppState extends State<AerRdpApp> {
         widget.credentialVault ?? CredentialVault(inMemoryOnly: !rustReady);
     _certTrustStore =
         widget.certTrustStore ?? CertTrustStore(inMemoryOnly: !rustReady);
+    _savedCredentialStore = widget.savedCredentialStore ??
+        SavedCredentialStore(inMemoryOnly: !rustReady);
+    _quickConnectHistoryStore = widget.quickConnectHistoryStore ??
+        QuickConnectHistoryStore(inMemoryOnly: !rustReady);
 
     _profileStore.load();
     _certTrustStore.load();
+    _savedCredentialStore.load();
+    _quickConnectHistoryStore.load();
   }
 
   @override
@@ -102,6 +118,12 @@ class _AerRdpAppState extends State<AerRdpApp> {
     if (widget.certTrustStore == null) {
       _certTrustStore.dispose();
     }
+    if (widget.savedCredentialStore == null) {
+      _savedCredentialStore.dispose();
+    }
+    if (widget.quickConnectHistoryStore == null) {
+      _quickConnectHistoryStore.dispose();
+    }
     super.dispose();
   }
 
@@ -110,12 +132,31 @@ class _AerRdpAppState extends State<AerRdpApp> {
     String? explicitPassword,
     required bool ephemeral,
   }) async {
+    final Size? viewPhysical = View.maybeOf(context)?.physicalSize;
     final Size mediaSize = MediaQuery.maybeSizeOf(context) ?? Size.zero;
     final double dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1.0;
 
     await _cancelPendingHandshake();
 
     String? password = explicitPassword;
+    String effectiveUsername = profile.username;
+    String effectiveDomain = profile.domain;
+
+    if ((password == null || password.isEmpty) &&
+        profile.credentialId != null) {
+      final linked = _savedCredentialStore.byId(profile.credentialId);
+      if (linked != null) {
+        password = await _credentialVault.loadVaultSecret(linked.id);
+        if (linked.kind == CredentialKind.account) {
+          if (effectiveUsername.isEmpty && linked.username.isNotEmpty) {
+            effectiveUsername = linked.username;
+          }
+          if (effectiveDomain.isEmpty && linked.domain.isNotEmpty) {
+            effectiveDomain = linked.domain;
+          }
+        }
+      }
+    }
     if ((password == null || password.isEmpty) &&
         profile.authMode == AuthMode.saved &&
         !ephemeral) {
@@ -128,8 +169,8 @@ class _AerRdpAppState extends State<AerRdpApp> {
     final AuthCredentials? initialCreds =
         (password != null && password.isNotEmpty)
             ? AuthCredentials(
-                username: profile.username,
-                domain: profile.domain.isEmpty ? null : profile.domain,
+                username: effectiveUsername,
+                domain: effectiveDomain.isEmpty ? null : effectiveDomain,
                 password: password,
               )
             : null;
@@ -140,17 +181,56 @@ class _AerRdpAppState extends State<AerRdpApp> {
       effW = profile.displayConfig.width;
       effH = profile.displayConfig.height;
     } else {
-      final int rawW = (mediaSize.width * dpr).round();
-      final int rawH = (mediaSize.height * dpr).round();
+      int rawW = (viewPhysical != null && viewPhysical.width > 0)
+          ? viewPhysical.width.round()
+          : (mediaSize.width * dpr).round();
+      int rawH = (viewPhysical != null && viewPhysical.height > 0)
+          ? viewPhysical.height.round()
+          : (mediaSize.height * dpr).round();
       if (rawW <= 0 || rawH <= 0) {
         effW = 1280;
         effH = 720;
       } else {
+        if (profile.displayConfig.orientationLock == OrientationLock.landscape &&
+            rawW < rawH) {
+          final int tmp = rawW;
+          rawW = rawH;
+          rawH = tmp;
+        } else if (profile.displayConfig.orientationLock ==
+                OrientationLock.portrait &&
+            rawW > rawH) {
+          final int tmp = rawW;
+          rawW = rawH;
+          rawH = tmp;
+        }
+        final int maxShortEdge =
+            switch (profile.displayConfig.effectiveProtocolBandwidth) {
+          BandwidthMode.highQuality => 1080,
+          BandwidthMode.balanced => 900,
+          BandwidthMode.lowBandwidth => 720,
+          BandwidthMode.custom => 900,
+        };
+        final int shortEdge = rawW < rawH ? rawW : rawH;
+        if (shortEdge > maxShortEdge) {
+          final double scaleDown = maxShortEdge / shortEdge;
+          rawW = (rawW * scaleDown).round();
+          rawH = (rawH * scaleDown).round();
+        }
         effW = rawW.clamp(200, 8192) & ~3;
         effH = rawH.clamp(200, 8192) & ~3;
       }
     }
     final int effScale = (profile.displayConfig.scale * 100).round();
+    final BandwidthMode effBw =
+        profile.displayConfig.effectiveProtocolBandwidth;
+
+    unawaited(
+      const MethodChannel('dev.aer.rdp/display')
+          .invokeMethod<void>('log', <String, Object?>{
+        'message':
+            'connect host=${profile.host}:${profile.port} size=${effW}x$effH audio=${profile.audioConfig.mode.jsonValue} fps=${profile.displayConfig.targetFps} bw=${profile.displayConfig.bandwidthMode.jsonValue}->${effBw.jsonValue}',
+      }).catchError((_) {}),
+    );
 
     final controller = await _sessionClient.connect(
       ConnectRequest(
@@ -160,6 +240,7 @@ class _AerRdpAppState extends State<AerRdpApp> {
         effectiveWidth: effW,
         effectiveHeight: effH,
         effectiveScaleFactor: effScale,
+        effectiveBandwidthMode: effBw,
       ),
     );
 
@@ -296,6 +377,8 @@ class _AerRdpAppState extends State<AerRdpApp> {
         initialUsername: profile.username,
         initialDomain: profile.domain,
         reason: reason,
+        savedCredentialStore: _savedCredentialStore,
+        credentialVault: _credentialVault,
         onSubmit: (c) => Navigator.of(dialogCtx).pop(c),
         onCancel: () => Navigator.of(dialogCtx).pop(null),
       ),
@@ -360,6 +443,8 @@ class _AerRdpAppState extends State<AerRdpApp> {
               profileStore: _profileStore,
               credentialVault: _credentialVault,
               certTrustStore: _certTrustStore,
+              savedCredentialStore: _savedCredentialStore,
+              quickConnectHistoryStore: _quickConnectHistoryStore,
               engineStatus: widget.engineStatus,
               onConnect: (profile,
                   {String? explicitPassword, required bool ephemeral}) {

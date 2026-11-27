@@ -1,14 +1,16 @@
-use ironrdp::core::{Encode as _, WriteCursor, encode_vec};
-use ironrdp::graphics::rdp6::{BitmapStreamEncoder, RgbAChannels};
-use ironrdp::pdu::bitmap::{BitmapData, BitmapUpdateData, CompressedDataHeader, Compression};
-use ironrdp::pdu::fast_path::{EncryptionFlags, FastPathHeader, FastPathUpdatePdu, Fragmentation, UpdateCode};
-use ironrdp::pdu::geometry::InclusiveRectangle;
-use ironrdp::pdu::mcs::SendDataIndication;
-use ironrdp::pdu::pointer::{
+use ironrdp_core::{Encode as _, WriteCursor, encode_vec};
+use ironrdp_graphics::rdp6::{BitmapStreamEncoder, RgbAChannels};
+use ironrdp_pdu::bitmap::{BitmapData, BitmapUpdateData, CompressedDataHeader, Compression};
+use ironrdp_pdu::fast_path::{
+    EncryptionFlags, FastPathHeader, FastPathUpdatePdu, Fragmentation, UpdateCode,
+};
+use ironrdp_pdu::geometry::InclusiveRectangle;
+use ironrdp_pdu::mcs::SendDataIndication;
+use ironrdp_pdu::pointer::{
     CachedPointerAttribute, ColorPointerAttribute, Point16, PointerAttribute,
     PointerPositionAttribute,
 };
-use ironrdp::pdu::x224::X224;
+use ironrdp_pdu::x224::X224;
 use std::borrow::Cow;
 
 use crate::rle16_24::compress_interleaved;

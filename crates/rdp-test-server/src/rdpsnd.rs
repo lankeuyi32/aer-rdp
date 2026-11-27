@@ -2,14 +2,14 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use ironrdp::core::{Decode as _, ReadCursor, impl_as_any};
-use ironrdp::pdu::PduResult;
-use ironrdp::pdu::gcc::ChannelName;
-use ironrdp::rdpsnd::pdu::{
+use ironrdp_core::{Decode as _, ReadCursor, impl_as_any};
+use ironrdp_pdu::PduResult;
+use ironrdp_pdu::gcc::ChannelName;
+use ironrdp_rdpsnd::pdu::{
     AudioFormat, ClientAudioOutputPdu, ServerAudioFormatPdu, ServerAudioOutputPdu, TrainingPdu,
     Version, VolumePdu, Wave2Pdu, WaveFormat, WavePdu,
 };
-use ironrdp::svc::{CompressionCondition, SvcMessage, SvcProcessor, SvcServerProcessor};
+use ironrdp_svc::{CompressionCondition, SvcMessage, SvcProcessor, SvcServerProcessor};
 use tracing::{debug, trace};
 
 use crate::ServerMetricsInner;
@@ -22,7 +22,7 @@ pub struct TestRdpsndProcessor {
     metrics: Arc<Mutex<ServerMetricsInner>>,
     ready: bool,
     negotiated_format_no: u16,
-    in_flight: HashMap<(u16, u8), Instant>,
+    in_flight: HashMap<u8, (u16, Instant)>,
     pending_training: VecDeque<(u16, Instant)>,
     next_block_no: u8,
     phase_samples: u64,
@@ -97,8 +97,8 @@ impl TestRdpsndProcessor {
     }
 
     /// Generates one PCM sine wave block (`chunk_ms` ms at `audio_hz`) and encodes it as
-    /// `SNDC_WAVE2` (`wVersion >= 8`) or `SNDC_WAVE` (`wVersion < 8`).
-    pub fn build_tone_wave_msg(&mut self, audio_hz: u32, chunk_ms: u32) -> SvcMessage {
+    /// `SNDC_WAVE2` (`wVersion >= 8`) or `SNDC_WAVE` + `SndWave` (`wVersion < 8`).
+    pub fn build_tone_wave_msgs(&mut self, audio_hz: u32, chunk_ms: u32) -> Vec<SvcMessage> {
         let frames = ((u64::from(self.sample_rate) * u64::from(chunk_ms)) / 1000).max(1) as usize;
         let mut pcm = Vec::with_capacity(frames * usize::from(self.channels) * 2);
         let freq = f64::from(audio_hz.max(1));
@@ -120,7 +120,7 @@ impl TestRdpsndProcessor {
         let block_no = self.next_block_no;
         self.next_block_no = self.next_block_no.wrapping_add(1);
 
-        self.in_flight.insert((ts, block_no), Instant::now());
+        self.in_flight.insert(block_no, (ts, Instant::now()));
         if let Ok(mut m) = self.metrics.lock() {
             m.audio_blocks_sent += 1;
             m.in_flight_window = self.in_flight.len() as u64;
@@ -128,22 +128,37 @@ impl TestRdpsndProcessor {
         }
 
         if self.version >= Version::V8 {
-            ServerAudioOutputPdu::Wave2(Wave2Pdu {
-                timestamp: ts,
-                format_no: self.negotiated_format_no,
-                block_no,
-                audio_timestamp: elapsed_ms,
-                data: pcm.into(),
-            })
-            .into()
+            vec![
+                ServerAudioOutputPdu::Wave2(Wave2Pdu {
+                    timestamp: ts,
+                    format_no: self.negotiated_format_no,
+                    block_no,
+                    audio_timestamp: elapsed_ms,
+                    data: pcm.into(),
+                })
+                .into(),
+            ]
         } else {
-            ServerAudioOutputPdu::Wave(WavePdu {
-                timestamp: ts,
-                format_no: self.negotiated_format_no,
-                block_no,
-                data: pcm.into(),
-            })
-            .into()
+            let mut data_prefix = [0u8; 4];
+            let prefix_len = pcm.len().min(4);
+            data_prefix[..prefix_len].copy_from_slice(&pcm[..prefix_len]);
+            let mut msgs: Vec<SvcMessage> = vec![
+                ServerAudioOutputPdu::Wave(WavePdu {
+                    timestamp: ts,
+                    format_no: self.negotiated_format_no,
+                    block_no,
+                    data_prefix,
+                    audio_length: u16::try_from(pcm.len()).unwrap_or(WavePdu::MAX_AUDIO_LENGTH),
+                })
+                .into(),
+            ];
+            if pcm.len() > 4 {
+                let mut body = Vec::with_capacity(4 + pcm.len() - 4);
+                body.extend_from_slice(&[0u8; 4]);
+                body.extend_from_slice(&pcm[4..]);
+                msgs.push(body.into());
+            }
+            msgs
         }
     }
 }
@@ -169,7 +184,7 @@ impl SvcProcessor for TestRdpsndProcessor {
 
     fn process(&mut self, payload: &[u8]) -> PduResult<Vec<SvcMessage>> {
         let pdu = ClientAudioOutputPdu::decode(&mut ReadCursor::new(payload))
-            .map_err(|e| ironrdp::pdu::decode_err!(e))?;
+            .map_err(|e| ironrdp_pdu::decode_err!(e))?;
         trace!(?pdu, "test server rdpsnd received client PDU");
 
         match pdu {
@@ -203,7 +218,7 @@ impl SvcProcessor for TestRdpsndProcessor {
                 Ok(Vec::new())
             }
             ClientAudioOutputPdu::WaveConfirm(wc) => {
-                if let Some(sent_at) = self.in_flight.remove(&(wc.timestamp, wc.block_no)) {
+                if let Some((_, sent_at)) = self.in_flight.remove(&wc.block_no) {
                     let lat = sent_at.elapsed().as_millis() as u64;
                     if let Ok(mut m) = self.metrics.lock() {
                         m.audio_blocks_confirmed += 1;

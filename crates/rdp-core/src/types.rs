@@ -55,6 +55,15 @@ pub enum AudioMode {
     Off,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum BandwidthMode {
+    #[default]
+    Balanced,
+    HighQuality,
+    LowBandwidth,
+}
+
 #[derive(Debug, Clone)]
 pub struct ConnectConfig {
     pub host: String,
@@ -66,6 +75,7 @@ pub struct ConnectConfig {
     pub scale_factor: u32,
     pub security_mode: SecurityMode,
     pub audio_mode: AudioMode,
+    pub bandwidth_mode: BandwidthMode,
     pub client_name: String,
     pub pinned_cert_sha256: Option<String>,
     pub enable_server_pointer: bool,
@@ -82,6 +92,7 @@ impl Default for ConnectConfig {
             scale_factor: 100,
             security_mode: SecurityMode::Auto,
             audio_mode: AudioMode::Local,
+            bandwidth_mode: BandwidthMode::Balanced,
             client_name: "aer-rdp".to_owned(),
             pinned_cert_sha256: None,
             enable_server_pointer: true,

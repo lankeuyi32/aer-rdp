@@ -66,6 +66,24 @@ enum OrientationLock {
   }
 }
 
+enum BandwidthMode {
+  balanced('balanced', 'Balanced'),
+  highQuality('highQuality', 'High'),
+  lowBandwidth('lowBandwidth', 'Saver'),
+  custom('custom', 'Custom');
+
+  const BandwidthMode(this.jsonValue, this.label);
+  final String jsonValue;
+  final String label;
+
+  static BandwidthMode? fromJson(Object? raw) {
+    for (final mode in values) {
+      if (mode.jsonValue == raw) return mode;
+    }
+    return null;
+  }
+}
+
 enum AudioMode {
   local('local', 'Local'),
   remote('remote', 'Remote'),
@@ -122,6 +140,9 @@ class DisplayConfig {
     this.height = 720,
     this.scale = 1.0,
     this.orientationLock = OrientationLock.auto,
+    this.targetFps = 60,
+    this.bandwidthMode = BandwidthMode.balanced,
+    this.maxBandwidthMbps = 15,
   });
 
   final DisplayMode mode;
@@ -129,6 +150,22 @@ class DisplayConfig {
   final int height;
   final double scale;
   final OrientationLock orientationLock;
+  final int targetFps;
+  final BandwidthMode bandwidthMode;
+  final int maxBandwidthMbps;
+
+  BandwidthMode get effectiveProtocolBandwidth {
+    if (bandwidthMode != BandwidthMode.custom) {
+      return bandwidthMode;
+    }
+    if (maxBandwidthMbps >= 20) {
+      return BandwidthMode.highQuality;
+    }
+    if (maxBandwidthMbps <= 5) {
+      return BandwidthMode.lowBandwidth;
+    }
+    return BandwidthMode.balanced;
+  }
 
   DisplayConfig copyWith({
     DisplayMode? mode,
@@ -136,6 +173,9 @@ class DisplayConfig {
     int? height,
     double? scale,
     OrientationLock? orientationLock,
+    int? targetFps,
+    BandwidthMode? bandwidthMode,
+    int? maxBandwidthMbps,
   }) {
     return DisplayConfig(
       mode: mode ?? this.mode,
@@ -143,6 +183,9 @@ class DisplayConfig {
       height: height ?? this.height,
       scale: scale ?? this.scale,
       orientationLock: orientationLock ?? this.orientationLock,
+      targetFps: targetFps ?? this.targetFps,
+      bandwidthMode: bandwidthMode ?? this.bandwidthMode,
+      maxBandwidthMbps: maxBandwidthMbps ?? this.maxBandwidthMbps,
     );
   }
 
@@ -152,6 +195,9 @@ class DisplayConfig {
         'height': height,
         'scale': scale,
         'orientationLock': orientationLock.jsonValue,
+        'targetFps': targetFps,
+        'bandwidthMode': bandwidthMode.jsonValue,
+        'maxBandwidthMbps': maxBandwidthMbps,
       };
 }
 
@@ -207,6 +253,7 @@ class ConnectionProfile {
     this.port = 3389,
     this.username = '',
     this.domain = '',
+    this.credentialId,
     this.authMode = AuthMode.prompt,
     this.securityMode = SecurityMode.auto,
     this.displayConfig = const DisplayConfig(),
@@ -222,6 +269,7 @@ class ConnectionProfile {
   final int port;
   final String username;
   final String domain;
+  final String? credentialId;
   final AuthMode authMode;
   final SecurityMode securityMode;
   final DisplayConfig displayConfig;
@@ -237,6 +285,8 @@ class ConnectionProfile {
     int? port,
     String? username,
     String? domain,
+    String? credentialId,
+    bool clearCredentialId = false,
     AuthMode? authMode,
     SecurityMode? securityMode,
     DisplayConfig? displayConfig,
@@ -253,6 +303,8 @@ class ConnectionProfile {
       port: port ?? this.port,
       username: username ?? this.username,
       domain: domain ?? this.domain,
+      credentialId:
+          clearCredentialId ? null : (credentialId ?? this.credentialId),
       authMode: authMode ?? this.authMode,
       securityMode: securityMode ?? this.securityMode,
       displayConfig: displayConfig ?? this.displayConfig,
@@ -272,6 +324,7 @@ class ConnectionProfile {
         'port': port,
         'username': username,
         'domain': domain,
+        if (credentialId != null) 'credentialId': credentialId,
         'authMode': authMode.jsonValue,
         'securityMode': securityMode.jsonValue,
         'displayConfig': displayConfig.toJson(),

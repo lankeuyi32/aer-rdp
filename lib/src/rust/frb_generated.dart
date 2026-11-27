@@ -873,6 +873,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  FfiBandwidthMode dco_decode_ffi_bandwidth_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return FfiBandwidthMode.values[raw as int];
+  }
+
+  @protected
   FfiCertInfo dco_decode_ffi_cert_info(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -899,8 +905,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   FfiConnectConfig dco_decode_ffi_connect_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return FfiConnectConfig(
       host: dco_decode_String(arr[0]),
       port: dco_decode_u_16(arr[1]),
@@ -909,10 +915,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       scaleFactor: dco_decode_u_32(arr[4]),
       securityMode: dco_decode_ffi_security_mode(arr[5]),
       audioMode: dco_decode_ffi_audio_mode(arr[6]),
-      clientName: dco_decode_String(arr[7]),
-      pinnedCertSha256: dco_decode_opt_String(arr[8]),
-      enableServerPointer: dco_decode_bool(arr[9]),
-      pointerSoftwareRendering: dco_decode_bool(arr[10]),
+      bandwidthMode: dco_decode_ffi_bandwidth_mode(arr[7]),
+      clientName: dco_decode_String(arr[8]),
+      pinnedCertSha256: dco_decode_opt_String(arr[9]),
+      enableServerPointer: dco_decode_bool(arr[10]),
+      pointerSoftwareRendering: dco_decode_bool(arr[11]),
     );
   }
 
@@ -1276,6 +1283,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  FfiBandwidthMode sse_decode_ffi_bandwidth_mode(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return FfiBandwidthMode.values[inner];
+  }
+
+  @protected
   FfiCertInfo sse_decode_ffi_cert_info(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_sha256Hex = sse_decode_String(deserializer);
@@ -1315,6 +1329,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_scaleFactor = sse_decode_u_32(deserializer);
     var var_securityMode = sse_decode_ffi_security_mode(deserializer);
     var var_audioMode = sse_decode_ffi_audio_mode(deserializer);
+    var var_bandwidthMode = sse_decode_ffi_bandwidth_mode(deserializer);
     var var_clientName = sse_decode_String(deserializer);
     var var_pinnedCertSha256 = sse_decode_opt_String(deserializer);
     var var_enableServerPointer = sse_decode_bool(deserializer);
@@ -1327,6 +1342,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       scaleFactor: var_scaleFactor,
       securityMode: var_securityMode,
       audioMode: var_audioMode,
+      bandwidthMode: var_bandwidthMode,
       clientName: var_clientName,
       pinnedCertSha256: var_pinnedCertSha256,
       enableServerPointer: var_enableServerPointer,
@@ -1775,6 +1791,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_ffi_bandwidth_mode(
+    FfiBandwidthMode self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_ffi_cert_info(FfiCertInfo self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.sha256Hex, serializer);
@@ -1808,6 +1833,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.scaleFactor, serializer);
     sse_encode_ffi_security_mode(self.securityMode, serializer);
     sse_encode_ffi_audio_mode(self.audioMode, serializer);
+    sse_encode_ffi_bandwidth_mode(self.bandwidthMode, serializer);
     sse_encode_String(self.clientName, serializer);
     sse_encode_opt_String(self.pinnedCertSha256, serializer);
     sse_encode_bool(self.enableServerPointer, serializer);

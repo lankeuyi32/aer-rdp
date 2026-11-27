@@ -239,7 +239,7 @@ class AudioSinkController {
       _platformPaused = pausedAtStart;
       _virtualClock = Stopwatch()..start();
       _pumpTimer = Timer.periodic(
-        const Duration(milliseconds: 20),
+        const Duration(milliseconds: 10),
         (_) => unawaited(pumpOnce()),
       );
     });
@@ -251,7 +251,10 @@ class AudioSinkController {
     if (session == null || _pumpInFlight) return;
     _pumpInFlight = true;
     try {
-      final int requestedFrames = ((_sampleRate * 20) ~/ 1000).clamp(1, 4096);
+      // Drain up to 120ms per 10ms tick so UI frame decode spikes never starve AudioTrack
+      // or cause the Rust jitter buffer to build up and chop audio.
+      final int maxDrainFrames = ((_sampleRate * 120) ~/ 1000).clamp(1, 16384);
+      final int nominalTickFrames = ((_sampleRate * 10) ~/ 1000).clamp(1, 4096);
       final bool useVirtualClock =
           !_platformAvailable || _appPaused || _platformPaused;
 
@@ -263,13 +266,13 @@ class AudioSinkController {
           clock.reset();
           creditFrames = (elapsedUs * _sampleRate) ~/ 1000000;
           if (creditFrames <= 0) {
-            creditFrames = requestedFrames;
+            creditFrames = nominalTickFrames;
           }
         }
       }
 
       final stats = session.readAudioPcm(
-        requestedFrames: requestedFrames,
+        requestedFrames: useVirtualClock ? creditFrames.clamp(1, maxDrainFrames) : maxDrainFrames,
         framesPlayedSinceLastRead: creditFrames,
       );
 

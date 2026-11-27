@@ -42,6 +42,40 @@ void main() {
       expect(vp.zoom, 1.0);
       expect(vp.panOffset, Offset.zero);
     });
+
+    test(
+        'auto-lifts desktop above soft keyboard obstruction while preserving upper focus targets and 1:1 coordinate mapping',
+        () {
+      // Portrait 1080x2400 remote desktop on 360x800 phone screen.
+      final vp = ViewportController(remoteWidth: 1080, remoteHeight: 2400);
+      vp.setViewportSize(const Size(360, 800));
+      expect(vp.computeDisplayRect(), const Rect.fromLTWH(0, 0, 360, 800));
+
+      // 1. Opening soft keyboard + SpecialKeyBar (380dp) without upper focus lifts full 380dp
+      //    so bottom of desktop (2399) sits right above the keyboard at y = 420.
+      vp.setBottomObstruction(380.0);
+      final liftedRect = vp.computeDisplayRect();
+      expect(liftedRect.bottom, closeTo(420.0, 0.5));
+      expect(liftedRect.top, closeTo(-380.0, 0.5));
+
+      // Tapping right above SpecialKeyBar (y = 419) maps accurately to bottom of remote desktop!
+      final bottomHit = vp.viewportToRemote(const Offset(180, 419));
+      expect(bottomHit, isNotNull);
+      expect(bottomHit!.dy, greaterThan(2385));
+
+      // Closing keyboard restores full-screen Offset.zero cleanly.
+      vp.setBottomObstruction(0.0);
+      expect(vp.panOffset, Offset.zero);
+      expect(vp.computeDisplayRect(), const Rect.fromLTWH(0, 0, 360, 800));
+
+      // 2. If user focused an input field in upper half (e.g. y = 30% -> 240dp on 800dp screen),
+      //    opening 380dp keyboard lifts only enough to keep focused target visible at y >= 72dp!
+      vp.setFocusRemoteY(2400 * 0.30);
+      vp.setBottomObstruction(380.0);
+      final smartRect = vp.computeDisplayRect();
+      final double shiftedTargetY = smartRect.top + 0.30 * smartRect.height;
+      expect(shiftedTargetY, closeTo(72.0, 1.0));
+    });
   });
 
   group('SessionCanvas gestures', () {
@@ -346,6 +380,34 @@ void main() {
       await p2.up();
       await tester.pump();
       expect(vp.zoom, greaterThan(1.5));
+
+      // Reset zoom back to 1.0, then perform a realistic human 2-finger vertical scroll
+      // where the two fingers naturally drift 24px farther apart (> 14px!) while moving up.
+      // It MUST lock to scroll and NEVER trigger pinch zoom!
+      vp.reset();
+      controller.recordedInputs.clear();
+      final d1 = await tester.startGesture(
+        center - const Offset(25, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      final d2 = await tester.startGesture(
+        center + const Offset(25, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      for (int step = 0; step < 4; step++) {
+        await d1.moveBy(const Offset(-3, -28));
+        await d2.moveBy(const Offset(3, -30));
+        await tester.pump();
+      }
+      await d1.up();
+      await d2.up();
+      await tester.pump();
+
+      expect(vp.zoom, closeTo(1.0, 0.001));
+      final driftScrolls = controller.recordedInputs
+          .where((e) => e.kind == 'pointer' && e.wheelDeltaV != 0)
+          .toList();
+      expect(driftScrolls, isNotEmpty);
     });
 
     testWidgets('Pointer-mode long-press touch-drag sends button-down move and release',
@@ -419,6 +481,107 @@ void main() {
       await tester.pump();
 
       expect(vp.zoom, greaterThan(1.5));
+
+      // Reset zoom back to 1.0, then perform a realistic human 2-finger vertical scroll
+      // where the two fingers naturally drift 24px farther apart (> 14px!) while moving up.
+      // It MUST lock to scroll and NEVER trigger pinch zoom!
+      vp.reset();
+      controller.recordedInputs.clear();
+      final d1 = await tester.startGesture(
+        center - const Offset(25, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      final d2 = await tester.startGesture(
+        center + const Offset(25, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      for (int step = 0; step < 4; step++) {
+        await d1.moveBy(const Offset(-3, -28));
+        await d2.moveBy(const Offset(3, -30));
+        await tester.pump();
+      }
+      await d1.up();
+      await d2.up();
+      await tester.pump();
+
+      expect(vp.zoom, closeTo(1.0, 0.001));
+      final driftScrolls = controller.recordedInputs
+          .where((e) => e.kind == 'pointer' && e.wheelDeltaV != 0)
+          .toList();
+      expect(driftScrolls, isNotEmpty);
+    });
+
+    testWidgets(
+        'touchResetEpoch clears stuck touch state so single-finger input never freezes after IME dismiss',
+        (WidgetTester tester) async {
+      const profile = ConnectionProfile(
+        id: 'p-reset',
+        name: 'ResetCanvas',
+        host: '127.0.0.1',
+        authMode: AuthMode.saved,
+      );
+      final controller = DemoRdpSessionController(
+        request: const ConnectRequest(
+          profile: profile,
+          initialCredentials: AuthCredentials(username: 'u', password: 'pw'),
+          pinnedCertSha256: DemoRdpSessionClient.defaultDemoFingerprint,
+        ),
+        serverFingerprint: DemoRdpSessionClient.defaultDemoFingerprint,
+      );
+      controller.start();
+      addTearDown(controller.dispose);
+
+      final vp = ViewportController();
+      addTearDown(vp.dispose);
+
+      int epoch = 0;
+      late StateSetter outerSetState;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (ctx, setState) {
+              outerSetState = setState;
+              return Scaffold(
+                body: SessionCanvas(
+                  controller: controller,
+                  viewportController: vp,
+                  inputMode: InputMode.pointer,
+                  swapButtons: false,
+                  touchResetEpoch: epoch,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final center = tester.getCenter(find.byKey(AerKeys.sessionCanvas));
+      // Simulate an orphaned touch pointer (e.g. swallowed by Android system IME back gesture).
+      final orphan = await tester.startGesture(
+        center - const Offset(50, 0),
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump();
+
+      // Trigger touchResetEpoch (as SessionPage does when IME closes externally).
+      outerSetState(() => epoch++);
+      await tester.pump();
+
+      controller.recordedInputs.clear();
+      // Subsequent single-finger tap in Pointer mode must still click normally instead of freezing in 2-finger mode.
+      await tester.tapAt(center);
+      await tester.pump();
+
+      final clicks = controller.recordedInputs
+          .where((e) =>
+              e.kind == 'pointer' && e.buttonMask == RdpPointerButtons.left)
+          .toList();
+      expect(clicks.length, 2);
+      expect(clicks[0].down, isTrue);
+      expect(clicks[1].down, isFalse);
+
+      await orphan.removePointer();
     });
   });
 }

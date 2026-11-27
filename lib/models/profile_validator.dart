@@ -72,6 +72,22 @@ abstract final class ProfileValidator {
     return parsed;
   }
 
+  static int? parseValidFps(String raw) {
+    final parsed = int.tryParse(raw.trim());
+    if (parsed == null || parsed < 15 || parsed > 120) {
+      return null;
+    }
+    return parsed;
+  }
+
+  static int? parseValidBandwidthMbps(String raw) {
+    final parsed = int.tryParse(raw.trim());
+    if (parsed == null || parsed < 1 || parsed > 200) {
+      return null;
+    }
+    return parsed;
+  }
+
   static ProfileBundleValidationResult validateBundleJson(String rawJson) {
     final Object? decoded;
     try {
@@ -190,6 +206,16 @@ abstract final class ProfileValidator {
         }
       }
 
+      String? credentialId;
+      if (item.containsKey('credentialId') && item['credentialId'] != null) {
+        final Object? rawCredId = item['credentialId'];
+        if (rawCredId is! String || rawCredId.trim().isEmpty) {
+          errors.add('$prefix.credentialId: must be a non-empty string.');
+        } else {
+          credentialId = rawCredId.trim();
+        }
+      }
+
       final AuthMode? authMode = AuthMode.fromJson(item['authMode']);
       if (authMode == null) {
         errors.add('$prefix.authMode: invalid value "${item['authMode']}".');
@@ -239,17 +265,70 @@ abstract final class ProfileValidator {
             '$prefix.displayConfig.orientationLock: invalid value "${rawDisplay['orientationLock']}".',
           );
         }
+
+        int targetFps = 60;
+        bool fpsOk = true;
+        if (rawDisplay.containsKey('targetFps') &&
+            rawDisplay['targetFps'] != null) {
+          final Object? rawFps = rawDisplay['targetFps'];
+          if (rawFps is! int || rawFps < 15 || rawFps > 120) {
+            errors.add(
+              '$prefix.displayConfig.targetFps: must be integer in [15, 120], got $rawFps.',
+            );
+            fpsOk = false;
+          } else {
+            targetFps = rawFps;
+          }
+        }
+
+        BandwidthMode bwMode = BandwidthMode.balanced;
+        bool bwModeOk = true;
+        if (rawDisplay.containsKey('bandwidthMode') &&
+            rawDisplay['bandwidthMode'] != null) {
+          final BandwidthMode? parsedBw =
+              BandwidthMode.fromJson(rawDisplay['bandwidthMode']);
+          if (parsedBw == null) {
+            errors.add(
+              '$prefix.displayConfig.bandwidthMode: invalid value "${rawDisplay['bandwidthMode']}".',
+            );
+            bwModeOk = false;
+          } else {
+            bwMode = parsedBw;
+          }
+        }
+
+        int maxBwMbps = 15;
+        bool maxBwOk = true;
+        if (rawDisplay.containsKey('maxBandwidthMbps') &&
+            rawDisplay['maxBandwidthMbps'] != null) {
+          final Object? rawMaxBw = rawDisplay['maxBandwidthMbps'];
+          if (rawMaxBw is! int || rawMaxBw < 1 || rawMaxBw > 200) {
+            errors.add(
+              '$prefix.displayConfig.maxBandwidthMbps: must be integer in [1, 200], got $rawMaxBw.',
+            );
+            maxBwOk = false;
+          } else {
+            maxBwMbps = rawMaxBw;
+          }
+        }
+
         if (dMode != null &&
             w is int &&
             h is int &&
             s is num &&
-            oLock != null) {
+            oLock != null &&
+            fpsOk &&
+            bwModeOk &&
+            maxBwOk) {
           displayConfig = DisplayConfig(
             mode: dMode,
             width: w,
             height: h,
             scale: s.toDouble(),
             orientationLock: oLock,
+            targetFps: targetFps,
+            bandwidthMode: bwMode,
+            maxBandwidthMbps: maxBwMbps,
           );
         }
       }
@@ -340,6 +419,7 @@ abstract final class ProfileValidator {
             port: port,
             username: username,
             domain: domain,
+            credentialId: credentialId,
             authMode: authMode,
             securityMode: securityMode,
             displayConfig: displayConfig,

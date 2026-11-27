@@ -40,14 +40,17 @@ class CredentialVault {
   factory CredentialVault.inMemory() => CredentialVault(inMemoryOnly: true);
 
   static const String _keyPrefix = 'aer_rdp_cred_';
+  static const String _vaultPrefix = 'aer_rdp_vault_';
+  static const String _quickPrefix = 'aer_rdp_quick_';
   final SecretStorageBackend _backend;
   bool _inMemoryOnly;
   final Map<String, String> _memory = <String, String>{};
 
   String _storageKey(String profileId) => '$_keyPrefix$profileId';
+  String _vaultKey(String credentialId) => '$_vaultPrefix$credentialId';
+  String _quickKey(String historyId) => '$_quickPrefix$historyId';
 
-  Future<void> savePassword(String profileId, String secret) async {
-    final key = _storageKey(profileId);
+  Future<void> _writeRaw(String key, String secret) async {
     _memory[key] = secret;
     if (_inMemoryOnly) return;
     try {
@@ -61,8 +64,7 @@ class CredentialVault {
     }
   }
 
-  Future<String?> loadPassword(String profileId) async {
-    final key = _storageKey(profileId);
+  Future<String?> _readRaw(String key) async {
     if (_inMemoryOnly) {
       return _memory[key];
     }
@@ -84,8 +86,7 @@ class CredentialVault {
     }
   }
 
-  Future<void> deletePassword(String profileId) async {
-    final key = _storageKey(profileId);
+  Future<void> _deleteRaw(String key) async {
     _memory.remove(key);
     if (_inMemoryOnly) return;
     try {
@@ -98,4 +99,31 @@ class CredentialVault {
       // Memory entry already removed.
     }
   }
+
+  Future<void> savePassword(String profileId, String secret) =>
+      _writeRaw(_storageKey(profileId), secret);
+
+  Future<String?> loadPassword(String profileId) =>
+      _readRaw(_storageKey(profileId));
+
+  Future<void> deletePassword(String profileId) =>
+      _deleteRaw(_storageKey(profileId));
+
+  Future<void> saveVaultSecret(String credentialId, String secret) =>
+      _writeRaw(_vaultKey(credentialId), secret);
+
+  Future<String?> loadVaultSecret(String credentialId) =>
+      _readRaw(_vaultKey(credentialId));
+
+  Future<void> deleteVaultSecret(String credentialId) =>
+      _deleteRaw(_vaultKey(credentialId));
+
+  Future<void> saveQuickConnectPassword(String historyId, String secret) =>
+      _writeRaw(_quickKey(historyId), secret);
+
+  Future<String?> loadQuickConnectPassword(String historyId) =>
+      _readRaw(_quickKey(historyId));
+
+  Future<void> deleteQuickConnectPassword(String historyId) =>
+      _deleteRaw(_quickKey(historyId));
 }

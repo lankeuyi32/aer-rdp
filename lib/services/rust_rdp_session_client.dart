@@ -18,6 +18,7 @@ class RustRdpSessionClient implements RdpSessionClient {
       scaleFactor: request.effectiveScaleFactor,
       securityMode: _mapSecurityMode(request.profile.securityMode),
       audioMode: _mapAudioMode(request.profile.audioConfig.mode),
+      bandwidthMode: _mapBandwidthMode(request.resolvedBandwidthMode),
       clientName: request.clientName,
       pinnedCertSha256: request.pinnedCertSha256,
       enableServerPointer: true,
@@ -57,6 +58,15 @@ class RustRdpSessionClient implements RdpSessionClient {
       AudioMode.local => rust_api.FfiAudioMode.local,
       AudioMode.remote => rust_api.FfiAudioMode.remote,
       AudioMode.off => rust_api.FfiAudioMode.off,
+    };
+  }
+
+  static rust_api.FfiBandwidthMode _mapBandwidthMode(BandwidthMode mode) {
+    return switch (mode) {
+      BandwidthMode.balanced => rust_api.FfiBandwidthMode.balanced,
+      BandwidthMode.highQuality => rust_api.FfiBandwidthMode.highQuality,
+      BandwidthMode.lowBandwidth => rust_api.FfiBandwidthMode.lowBandwidth,
+      BandwidthMode.custom => rust_api.FfiBandwidthMode.balanced,
     };
   }
 }

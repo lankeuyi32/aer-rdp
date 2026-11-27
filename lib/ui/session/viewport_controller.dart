@@ -15,14 +15,34 @@ class ViewportController extends ChangeNotifier {
   int _remoteWidth;
   int _remoteHeight;
   Size _viewportSize = Size.zero;
+  double _bottomObstruction = 0.0;
   double _zoom = 1.0;
   Offset _panOffset = Offset.zero;
+  bool _stretchToFill = false;
+  double _focusNormY = 1.0;
+  bool _hasUserFocusTarget = false;
 
   int get remoteWidth => _remoteWidth;
   int get remoteHeight => _remoteHeight;
   Size get viewportSize => _viewportSize;
+  double get bottomObstruction => _bottomObstruction;
   double get zoom => _zoom;
   Offset get panOffset => _panOffset;
+  bool get stretchToFill => _stretchToFill;
+
+  void setFocusRemoteY(double remoteY, {bool userInitiated = true}) {
+    final double denom = _remoteHeight <= 1 ? 1.0 : (_remoteHeight - 1).toDouble();
+    _focusNormY = (remoteY / denom).clamp(0.0, 1.0);
+    if (userInitiated) {
+      _hasUserFocusTarget = true;
+    }
+  }
+
+  void toggleStretchToFill() {
+    _stretchToFill = !_stretchToFill;
+    _clampPan();
+    notifyListeners();
+  }
 
   void setRemoteSize(int width, int height) {
     final w = math.max(1, width);
@@ -41,13 +61,74 @@ class ViewportController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setBottomObstruction(double pixels) {
+    updateLayoutMetrics(
+      viewportSize: _viewportSize,
+      bottomObstruction: pixels,
+    );
+  }
+
+  void updateLayoutMetrics({
+    required Size viewportSize,
+    required double bottomObstruction,
+  }) {
+    final double maxAllowable =
+        viewportSize.height > 0 ? viewportSize.height * 0.78 : 10000.0;
+    final double clampedObs = bottomObstruction.clamp(0.0, maxAllowable);
+    final bool sizeChanged = _viewportSize != viewportSize;
+    final double obsDelta = clampedObs - _bottomObstruction;
+    if (!sizeChanged && obsDelta.abs() < 0.25) return;
+
+    final double prevObs = _bottomObstruction;
+    _viewportSize = viewportSize;
+    _bottomObstruction = clampedObs;
+
+    if (!_viewportSize.isEmpty && clampedObs > prevObs) {
+      // Soft keyboard is opening/growing: automatically lift the canvas upward so the bottom half
+      // of the remote desktop (and active cursor/input field) rises above the keyboard + key bar,
+      // while never pushing an explicitly-focused upper-screen target off the top edge.
+      final Rect base = computeFittedBaseRect();
+      final double scaledH = base.height * _zoom;
+      final double unshiftedTop = base.center.dy - scaledH / 2.0;
+      final double unshiftedBottom = unshiftedTop + scaledH;
+      final double visibleBottom = _viewportSize.height - clampedObs;
+      final double totalOverlap = math.max(0.0, unshiftedBottom - visibleBottom);
+
+      double desiredUpwardShift = totalOverlap;
+      if (_hasUserFocusTarget) {
+        final double cursorUnshiftedY = unshiftedTop + _focusNormY * scaledH;
+        const double topKeepVisibleMargin = 72.0;
+        final double maxShiftBeforeHidingCursor =
+            math.max(0.0, cursorUnshiftedY - topKeepVisibleMargin);
+        desiredUpwardShift =
+            math.min(desiredUpwardShift, maxShiftBeforeHidingCursor);
+      }
+
+      if (-desiredUpwardShift < _panOffset.dy) {
+        _panOffset = Offset(_panOffset.dx, -desiredUpwardShift);
+      }
+    }
+
+    _clampPan();
+    notifyListeners();
+  }
+
   Rect computeFittedBaseRect([Size? explicitViewportSize]) {
     final vp = explicitViewportSize ?? _viewportSize;
     if (vp.width <= 0 || vp.height <= 0) {
       return Rect.zero;
     }
+    if (_stretchToFill) {
+      return Offset.zero & vp;
+    }
     final double remoteAspect = _remoteWidth / _remoteHeight;
     final double vpAspect = vp.width / vp.height;
+
+    // Eliminate sub-pixel/alignment black slivers when aspect ratios match closely (e.g. 4px RDP alignment).
+    final double relDiff = (vpAspect - remoteAspect).abs() / remoteAspect;
+    if (relDiff <= 0.025) {
+      return Offset.zero & vp;
+    }
 
     final double fitW;
     final double fitH;
@@ -123,9 +204,12 @@ class ViewportController extends ChangeNotifier {
     final double scaledH = base.height * _zoom;
     final double maxDx = math.max(0.0, (scaledW - _viewportSize.width) / 2.0);
     final double maxDy = math.max(0.0, (scaledH - _viewportSize.height) / 2.0);
+    final double unshiftedBottom = base.center.dy + scaledH / 2.0;
+    final double visibleBottom = _viewportSize.height - _bottomObstruction;
+    final double minDy = math.min(-maxDy, visibleBottom - unshiftedBottom);
     _panOffset = Offset(
       _panOffset.dx.clamp(-maxDx, maxDx),
-      _panOffset.dy.clamp(-maxDy, maxDy),
+      _panOffset.dy.clamp(minDy, maxDy),
     );
   }
 

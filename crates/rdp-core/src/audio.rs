@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Instant;
 
-use ironrdp::rdpsnd::pdu::WaveConfirmPdu;
+use ironrdp_rdpsnd::pdu::WaveConfirmPdu;
 use tokio::sync::Notify;
 
 use crate::types::AudioReadStats;
@@ -51,6 +52,7 @@ struct QueuedConfirm {
     block_no: u8,
     fifo_frames_left: u64,
     sink_frames_left: u64,
+    arrived_at: Instant,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +60,15 @@ struct InSinkConfirm {
     timestamp: u16,
     block_no: u8,
     sink_frames_left: u64,
+    arrived_at: Instant,
+}
+
+fn build_paced_wave_confirm(timestamp: u16, block_no: u8, arrived_at: Instant) -> WaveConfirmPdu {
+    let delay_ms = (arrived_at.elapsed().as_millis() % 0x1_0000) as u16;
+    WaveConfirmPdu {
+        timestamp: timestamp.wrapping_add(delay_ms),
+        block_no,
+    }
 }
 
 /// Bounded PCM jitter buffer that paces `SNDC_WAVECONFIRM` emission to actual audio sink
@@ -112,21 +123,37 @@ impl AudioJitterBuffer {
         self.format
     }
 
+    pub fn set_buffer_limits(
+        &mut self,
+        prebuffer_ms: u32,
+        target_buffer_ms: u32,
+        max_buffer_ms: u32,
+    ) {
+        let target = target_buffer_ms.max(20);
+        let pre = prebuffer_ms.min(target);
+        let max = max_buffer_ms.max(target.saturating_add(40));
+        self.prebuffer_ms = pre;
+        self.target_buffer_ms = target;
+        self.max_buffer_ms = max;
+    }
+
     pub fn set_format(&mut self, format: AudioStreamFormat) {
         if self.format != format {
             let had_pending =
                 !self.in_sink_confirms.is_empty() || !self.queued_confirms.is_empty();
             while let Some(front) = self.in_sink_confirms.pop_front() {
-                self.ready_confirms.push_back(WaveConfirmPdu {
-                    timestamp: front.timestamp,
-                    block_no: front.block_no,
-                });
+                self.ready_confirms.push_back(build_paced_wave_confirm(
+                    front.timestamp,
+                    front.block_no,
+                    front.arrived_at,
+                ));
             }
             while let Some(front) = self.queued_confirms.pop_front() {
-                self.ready_confirms.push_back(WaveConfirmPdu {
-                    timestamp: front.timestamp,
-                    block_no: front.block_no,
-                });
+                self.ready_confirms.push_back(build_paced_wave_confirm(
+                    front.timestamp,
+                    front.block_no,
+                    front.arrived_at,
+                ));
             }
             self.format = format;
             self.pcm_fifo.clear();
@@ -207,6 +234,7 @@ impl AudioJitterBuffer {
             block_no,
             fifo_frames_left: frames_added,
             sink_frames_left: 0,
+            arrived_at: Instant::now(),
         });
     }
 
@@ -220,10 +248,11 @@ impl AudioJitterBuffer {
                 played -= take;
                 if front.sink_frames_left == 0 {
                     let done = self.in_sink_confirms.pop_front().expect("front exists");
-                    self.ready_confirms.push_back(WaveConfirmPdu {
-                        timestamp: done.timestamp,
-                        block_no: done.block_no,
-                    });
+                    self.ready_confirms.push_back(build_paced_wave_confirm(
+                        done.timestamp,
+                        done.block_no,
+                        done.arrived_at,
+                    ));
                     newly_ready = true;
                 }
             } else if let Some(front) = self.queued_confirms.front_mut() {
@@ -255,6 +284,7 @@ impl AudioJitterBuffer {
                     timestamp: moved.timestamp,
                     block_no: moved.block_no,
                     sink_frames_left: moved.sink_frames_left,
+                    arrived_at: moved.arrived_at,
                 });
             }
         }
@@ -307,16 +337,18 @@ impl AudioJitterBuffer {
                 if front.fifo_frames_left == 0 {
                     let done = self.queued_confirms.pop_front().expect("front exists");
                     if done.sink_frames_left == 0 {
-                        self.ready_confirms.push_back(WaveConfirmPdu {
-                            timestamp: done.timestamp,
-                            block_no: done.block_no,
-                        });
+                        self.ready_confirms.push_back(build_paced_wave_confirm(
+                            done.timestamp,
+                            done.block_no,
+                            done.arrived_at,
+                        ));
                         newly_ready = true;
                     } else {
                         self.in_sink_confirms.push_back(InSinkConfirm {
                             timestamp: done.timestamp,
                             block_no: done.block_no,
                             sink_frames_left: done.sink_frames_left,
+                            arrived_at: done.arrived_at,
                         });
                     }
                 }

@@ -1,9 +1,12 @@
 import 'dart:io';
 
 import 'package:aer_rdp/models/connection_profile.dart';
+import 'package:aer_rdp/models/saved_credential.dart';
 import 'package:aer_rdp/services/cert_trust_store.dart';
 import 'package:aer_rdp/services/credential_vault.dart';
 import 'package:aer_rdp/services/profile_store.dart';
+import 'package:aer_rdp/services/quick_connect_history_store.dart';
+import 'package:aer_rdp/services/saved_credential_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -97,6 +100,87 @@ void main() {
       );
       await reloaded.clearFingerprint('example.com', 3389);
       expect(reloaded.getPinnedFingerprint('example.com', 3389), isNull);
+    });
+
+    test(
+        'SavedCredentialStore & QuickConnectHistoryStore persist metadata without plaintext secrets',
+        () async {
+      final tmp = await Directory.systemTemp.createTemp('aer_rdp_vault_hist_');
+      addTearDown(() => tmp.delete(recursive: true));
+
+      final vault = CredentialVault.inMemory();
+      final credStore =
+          SavedCredentialStore(directoryProvider: () async => tmp);
+      await credStore.load();
+      await credStore.upsert(
+        SavedCredential(
+          id: 'c-acc',
+          name: '主力账号',
+          kind: CredentialKind.account,
+          username: 'aer',
+          domain: 'WORKGROUP',
+          note: 'Win11',
+          updatedAt: DateTime.utc(2026, 11, 27, 6, 0),
+        ),
+      );
+      await vault.saveVaultSecret('c-acc', 'SuperSecret#1');
+      await credStore.upsert(
+        SavedCredential(
+          id: 'c-key',
+          name: 'SSH 恢复密钥',
+          kind: CredentialKind.secretKey,
+          note: 'ed25519',
+          updatedAt: DateTime.utc(2026, 11, 27, 6, 5),
+        ),
+      );
+      await vault.saveVaultSecret('c-key', 'ssh-ed25519 AAAAC3Nza...');
+
+      final credJson = await File(
+        '${tmp.path}${Platform.pathSeparator}saved_credentials_v1.json',
+      ).readAsString();
+      expect(credJson.contains('SuperSecret#1'), isFalse);
+      expect(credJson.contains('AAAAC3Nza'), isFalse);
+
+      final reloadedCreds =
+          SavedCredentialStore(directoryProvider: () async => tmp);
+      await reloadedCreds.load();
+      expect(reloadedCreds.items, hasLength(2));
+      expect(reloadedCreds.items.first.id, 'c-key');
+      expect(await vault.loadVaultSecret('c-acc'), 'SuperSecret#1');
+
+      final histStore =
+          QuickConnectHistoryStore(directoryProvider: () async => tmp);
+      await histStore.load();
+      final (e1, _) = await histStore.recordConnection(
+        host: '192.168.1.50',
+        port: 3389,
+        username: 'admin',
+        hasSavedPassword: true,
+        connectedAt: DateTime.utc(2026, 11, 27, 6, 10),
+      );
+      await vault.saveQuickConnectPassword(e1.id, 'QuickPass!');
+      // Reconnecting to same host:port deduplicates and updates username.
+      final (e1Updated, _) = await histStore.recordConnection(
+        host: '192.168.1.50',
+        port: 3389,
+        username: 'aer',
+        hasSavedPassword: true,
+        connectedAt: DateTime.utc(2026, 11, 27, 6, 20),
+      );
+      expect(e1Updated.id, e1.id);
+      expect(histStore.entries, hasLength(1));
+      expect(histStore.entries.single.username, 'aer');
+
+      final histJson = await File(
+        '${tmp.path}${Platform.pathSeparator}quick_connect_history_v1.json',
+      ).readAsString();
+      expect(histJson.contains('QuickPass!'), isFalse);
+
+      final reloadedHist =
+          QuickConnectHistoryStore(directoryProvider: () async => tmp);
+      await reloadedHist.load();
+      expect(reloadedHist.entries, hasLength(1));
+      expect(reloadedHist.entries.single.host, '192.168.1.50');
     });
   });
 }

@@ -1,5 +1,5 @@
-use ironrdp::input::{Database, MouseButton, MousePosition, Operation, Scancode, WheelRotations};
-use ironrdp::pdu::input::fast_path::{FastPathInputEvent, KeyboardFlags};
+use ironrdp_input::{Database, MouseButton, MousePosition, Operation, Scancode, WheelRotations};
+use ironrdp_pdu::input::fast_path::{FastPathInputEvent, KeyboardFlags};
 
 pub struct InputController {
     db: Database,

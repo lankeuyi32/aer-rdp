@@ -6,7 +6,11 @@ import '../../models/profile_validator.dart';
 import '../../services/cert_trust_store.dart';
 import '../../services/credential_vault.dart';
 import '../../services/profile_store.dart';
+import '../../services/quick_connect_history_store.dart';
+import '../../services/saved_credential_store.dart';
 import '../aer_keys.dart';
+import '../common/adaptive_dialog.dart';
+import 'credential_vault_dialog.dart';
 import 'profile_form_dialog.dart';
 import 'quick_connect_dialog.dart';
 
@@ -22,6 +26,8 @@ class ConnectionCenterPage extends StatefulWidget {
     required this.profileStore,
     required this.credentialVault,
     required this.certTrustStore,
+    this.savedCredentialStore,
+    this.quickConnectHistoryStore,
     required this.engineStatus,
     required this.onConnect,
   });
@@ -29,6 +35,8 @@ class ConnectionCenterPage extends StatefulWidget {
   final ProfileStore profileStore;
   final CredentialVault credentialVault;
   final CertTrustStore certTrustStore;
+  final SavedCredentialStore? savedCredentialStore;
+  final QuickConnectHistoryStore? quickConnectHistoryStore;
   final String engineStatus;
   final ConnectProfileCallback onConnect;
 
@@ -38,16 +46,27 @@ class ConnectionCenterPage extends StatefulWidget {
 
 class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
   final TextEditingController _searchCtrl = TextEditingController();
+  late SavedCredentialStore _fallbackCredentialStore;
+  late QuickConnectHistoryStore _fallbackHistoryStore;
   String _searchQuery = '';
   String? _selectedProfileId;
   String? _expandedCardId;
   String? _exportedJsonPreview;
 
+  SavedCredentialStore get _credStore =>
+      widget.savedCredentialStore ?? _fallbackCredentialStore;
+  QuickConnectHistoryStore get _historyStore =>
+      widget.quickConnectHistoryStore ?? _fallbackHistoryStore;
+
   @override
   void initState() {
     super.initState();
+    _fallbackCredentialStore = SavedCredentialStore.inMemory();
+    _fallbackHistoryStore = QuickConnectHistoryStore.inMemory();
     widget.profileStore.addListener(_onStoreChanged);
     widget.certTrustStore.addListener(_onStoreChanged);
+    _credStore.addListener(_onStoreChanged);
+    _historyStore.addListener(_onStoreChanged);
   }
 
   @override
@@ -61,12 +80,27 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
       oldWidget.certTrustStore.removeListener(_onStoreChanged);
       widget.certTrustStore.addListener(_onStoreChanged);
     }
+    final oldCred = oldWidget.savedCredentialStore ?? _fallbackCredentialStore;
+    if (oldCred != _credStore) {
+      oldCred.removeListener(_onStoreChanged);
+      _credStore.addListener(_onStoreChanged);
+    }
+    final oldHist =
+        oldWidget.quickConnectHistoryStore ?? _fallbackHistoryStore;
+    if (oldHist != _historyStore) {
+      oldHist.removeListener(_onStoreChanged);
+      _historyStore.addListener(_onStoreChanged);
+    }
   }
 
   @override
   void dispose() {
     widget.profileStore.removeListener(_onStoreChanged);
     widget.certTrustStore.removeListener(_onStoreChanged);
+    _credStore.removeListener(_onStoreChanged);
+    _historyStore.removeListener(_onStoreChanged);
+    _fallbackCredentialStore.dispose();
+    _fallbackHistoryStore.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -77,17 +111,35 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
     }
   }
 
+  Future<void> _openCredentialVault() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => CredentialVaultDialog(
+        savedCredentialStore: _credStore,
+        credentialVault: widget.credentialVault,
+        certTrustStore: widget.certTrustStore,
+        onCredentialDeleted: (deletedId) {
+          widget.profileStore.detachCredentialId(deletedId);
+          _historyStore.detachCredentialId(deletedId);
+        },
+      ),
+    );
+  }
+
   Future<void> _openAddProfile() async {
     final res = await showDialog<ProfileFormResult>(
       context: context,
       builder: (_) => ProfileFormDialog(
         credentialVault: widget.credentialVault,
         certTrustStore: widget.certTrustStore,
+        savedCredentialStore: _credStore,
       ),
     );
     if (res == null) return;
     await widget.profileStore.upsert(res.profile);
-    if (res.password.isNotEmpty) {
+    if (res.profile.credentialId != null) {
+      await widget.credentialVault.deletePassword(res.profile.id);
+    } else if (res.password.isNotEmpty) {
       await widget.credentialVault.savePassword(res.profile.id, res.password);
     } else if (!res.preserveSavedPassword) {
       await widget.credentialVault.deletePassword(res.profile.id);
@@ -104,11 +156,14 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
         existing: profile,
         credentialVault: widget.credentialVault,
         certTrustStore: widget.certTrustStore,
+        savedCredentialStore: _credStore,
       ),
     );
     if (res == null) return;
     await widget.profileStore.upsert(res.profile);
-    if (res.password.isNotEmpty) {
+    if (res.profile.credentialId != null) {
+      await widget.credentialVault.deletePassword(res.profile.id);
+    } else if (res.password.isNotEmpty) {
       await widget.credentialVault.savePassword(res.profile.id, res.password);
     } else if (!res.preserveSavedPassword) {
       await widget.credentialVault.deletePassword(res.profile.id);
@@ -132,12 +187,41 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
   Future<void> _openQuickConnect() async {
     final res = await showDialog<QuickConnectResult>(
       context: context,
-      builder: (_) => const QuickConnectDialog(),
+      builder: (_) => QuickConnectDialog(
+        historyStore: _historyStore,
+        savedCredentialStore: _credStore,
+        credentialVault: widget.credentialVault,
+      ),
     );
     if (res == null) return;
+
+    final bool shouldSaveInlinePw = res.profile.credentialId == null &&
+        res.rememberPassword &&
+        res.password.isNotEmpty;
+    final (savedEntry, evictedIds) = await _historyStore.recordConnection(
+      host: res.profile.host,
+      port: res.profile.port,
+      username: res.profile.username,
+      domain: res.profile.domain,
+      credentialId: res.profile.credentialId,
+      hasSavedPassword: shouldSaveInlinePw,
+    );
+    if (shouldSaveInlinePw) {
+      await widget.credentialVault.saveQuickConnectPassword(
+        savedEntry.id,
+        res.password,
+      );
+    } else {
+      await widget.credentialVault.deleteQuickConnectPassword(savedEntry.id);
+    }
+    for (final evictedId in evictedIds) {
+      await widget.credentialVault.deleteQuickConnectPassword(evictedId);
+    }
+
+    if (!mounted) return;
     widget.onConnect(
       res.profile,
-      explicitPassword: res.password,
+      explicitPassword: res.password.isNotEmpty ? res.password : null,
       ephemeral: true,
     );
   }
@@ -369,14 +453,18 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
     final isPinned = widget.certTrustStore
             .getPinnedFingerprint(selected.host, selected.port) !=
         null;
-    final String userSummary = selected.username.isEmpty
-        ? '(prompt)'
-        : selected.domain.isEmpty
-            ? selected.username
-            : '${selected.domain}\\${selected.username}';
-    final String displaySummary = selected.displayConfig.mode == DisplayMode.custom
-        ? '${selected.displayConfig.mode.label} (${selected.displayConfig.width}x${selected.displayConfig.height} @ ${selected.displayConfig.scale}x)'
-        : '${selected.displayConfig.mode.label} (${selected.displayConfig.scale}x)';
+    final linkedCred = _credStore.byId(selected.credentialId);
+    final String userSummary = linkedCred != null
+        ? '${linkedCred.name}${selected.username.isNotEmpty ? " (${selected.username})" : ""}'
+        : selected.username.isEmpty
+            ? '(prompt)'
+            : selected.domain.isEmpty
+                ? selected.username
+                : '${selected.domain}\\${selected.username}';
+    final String displaySummary =
+        selected.displayConfig.mode == DisplayMode.custom
+            ? '${selected.displayConfig.mode.label} (${selected.displayConfig.width}x${selected.displayConfig.height} @ ${selected.displayConfig.scale}x)'
+            : '${selected.displayConfig.mode.label} (${selected.displayConfig.scale}x)';
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -439,18 +527,28 @@ class _ConnectionCenterPageState extends State<ConnectionCenterPage> {
         actions: [
           IconButton(
             key: AerKeys.quickConnectButton,
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.bolt),
             tooltip: 'Quick Connect',
             onPressed: _openQuickConnect,
           ),
           IconButton(
+            key: AerKeys.credentialVaultButton,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.key_outlined),
+            tooltip: '凭据与密钥库',
+            onPressed: _openCredentialVault,
+          ),
+          IconButton(
             key: AerKeys.importProfilesButton,
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.file_upload_outlined),
             tooltip: 'Import JSON',
             onPressed: _openImportDialog,
           ),
           IconButton(
             key: AerKeys.exportProfilesButton,
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.file_download_outlined),
             tooltip: 'Export JSON',
             onPressed: _exportProfiles,
@@ -524,38 +622,9 @@ class _ImportProfilesDialogState extends State<_ImportProfilesDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return AdaptiveDialogShell(
+      maxWidth: 460,
       title: const Text('Import Profiles (JSON v1)'),
-      content: SizedBox(
-        width: 460,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_dialogError != null) ...[
-                Text(
-                  _dialogError!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              TextField(
-                controller: _controller,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  labelText: 'Profile Bundle JSON',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -566,6 +635,31 @@ class _ImportProfilesDialogState extends State<_ImportProfilesDialog> {
           child: const Text('Import'),
         ),
       ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_dialogError != null) ...[
+            Text(
+              _dialogError!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          TextField(
+            controller: _controller,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              labelText: 'Profile Bundle JSON',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

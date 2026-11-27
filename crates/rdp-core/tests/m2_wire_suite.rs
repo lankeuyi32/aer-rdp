@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use ironrdp::graphics::color_conversion::rdp_16bit_to_rgb;
-use ironrdp::pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode};
+use ironrdp_graphics::color_conversion::rdp_16bit_to_rgb;
+use ironrdp_pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode};
 use rdp_core::{
     AudioMode, AuthCredentials, CertInfo, CertTrustDecision, ConnectConfig, SecurityMode,
     SessionEvent, SessionHandle, SessionState, connect,

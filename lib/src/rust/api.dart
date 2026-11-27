@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `coalesce_dirty_rect`, `extract_frame_patch`, `read_audio_from_buffer`, `runtime`, `to_core_config`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 RdpEngineSummary getEngineSummary() =>
     RustLib.instance.api.crateApiGetEngineSummary();
@@ -135,6 +135,8 @@ class FfiAudioReadResult {
           bitsPerSample == other.bitsPerSample;
 }
 
+enum FfiBandwidthMode { balanced, highQuality, lowBandwidth }
+
 class FfiCertInfo {
   final String sha256Hex;
   final String? subjectCn;
@@ -188,6 +190,7 @@ class FfiConnectConfig {
   final int scaleFactor;
   final FfiSecurityMode securityMode;
   final FfiAudioMode audioMode;
+  final FfiBandwidthMode bandwidthMode;
   final String clientName;
   final String? pinnedCertSha256;
   final bool enableServerPointer;
@@ -201,6 +204,7 @@ class FfiConnectConfig {
     required this.scaleFactor,
     required this.securityMode,
     required this.audioMode,
+    required this.bandwidthMode,
     required this.clientName,
     this.pinnedCertSha256,
     required this.enableServerPointer,
@@ -216,6 +220,7 @@ class FfiConnectConfig {
       scaleFactor.hashCode ^
       securityMode.hashCode ^
       audioMode.hashCode ^
+      bandwidthMode.hashCode ^
       clientName.hashCode ^
       pinnedCertSha256.hashCode ^
       enableServerPointer.hashCode ^
@@ -233,6 +238,7 @@ class FfiConnectConfig {
           scaleFactor == other.scaleFactor &&
           securityMode == other.securityMode &&
           audioMode == other.audioMode &&
+          bandwidthMode == other.bandwidthMode &&
           clientName == other.clientName &&
           pinnedCertSha256 == other.pinnedCertSha256 &&
           enableServerPointer == other.enableServerPointer &&

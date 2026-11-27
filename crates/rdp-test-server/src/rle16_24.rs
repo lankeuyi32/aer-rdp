@@ -88,7 +88,7 @@ pub fn compress_interleaved(bottom_up_pixels: &[u8], bpp_bytes: usize) -> Vec<u8
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ironrdp::graphics::rle::{RlePixelFormat, decompress};
+    use ironrdp_graphics::rle::{RlePixelFormat, decompress};
 
     #[test]
     fn rle16_round_trips_through_ironrdp_decompress() {

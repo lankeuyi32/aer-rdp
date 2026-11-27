@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use ironrdp::pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode};
+use ironrdp_pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode};
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};

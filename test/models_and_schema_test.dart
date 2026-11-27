@@ -131,5 +131,88 @@ void main() {
       expect(res.isValid, isFalse);
       expect(res.errors.length, greaterThanOrEqualTo(5));
     });
+
+    test(
+        'accepts legacy v1 displayConfig without targetFps/bandwidthMode and roundtrips custom FPS & bandwidth',
+        () {
+      const legacyV1 = '''
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "legacy-1",
+      "name": "Legacy",
+      "host": "10.0.0.50",
+      "port": 3389,
+      "username": "aer",
+      "domain": "",
+      "authMode": "prompt",
+      "securityMode": "auto",
+      "displayConfig": { "mode": "matchDevice", "width": 1280, "height": 720, "scale": 1.0, "orientationLock": "auto" },
+      "audioConfig": { "mode": "local" },
+      "inputConfig": { "defaultMode": "directTouch", "swapButtons": false, "textInputMode": "scancode" },
+      "favorite": false,
+      "lastConnectedAt": null
+    }
+  ]
+}
+''';
+      final legacyRes = ProfileValidator.validateBundleJson(legacyV1);
+      expect(legacyRes.isValid, isTrue, reason: legacyRes.errors.join('; '));
+      final legacyProfile = legacyRes.profiles.single;
+      expect(legacyProfile.displayConfig.targetFps, 60);
+      expect(legacyProfile.displayConfig.bandwidthMode, BandwidthMode.balanced);
+      expect(legacyProfile.displayConfig.maxBandwidthMbps, 15);
+
+      final customProfile = legacyProfile.copyWith(
+        displayConfig: legacyProfile.displayConfig.copyWith(
+          targetFps: 120,
+          bandwidthMode: BandwidthMode.custom,
+          maxBandwidthMbps: 35,
+        ),
+      );
+      expect(
+        customProfile.displayConfig.effectiveProtocolBandwidth,
+        BandwidthMode.highQuality,
+      );
+
+      final roundtripJson =
+          ProfileBundleV1(profiles: <ConnectionProfile>[customProfile])
+              .toPrettyJson();
+      final roundtripRes = ProfileValidator.validateBundleJson(roundtripJson);
+      expect(roundtripRes.isValid, isTrue);
+      expect(roundtripRes.profiles.single.displayConfig.targetFps, 120);
+      expect(
+        roundtripRes.profiles.single.displayConfig.bandwidthMode,
+        BandwidthMode.custom,
+      );
+      expect(roundtripRes.profiles.single.displayConfig.maxBandwidthMbps, 35);
+
+      const badFpsBw = '''
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "bad-fps",
+      "name": "Bad",
+      "host": "10.0.0.51",
+      "port": 3389,
+      "username": "",
+      "domain": "",
+      "authMode": "prompt",
+      "securityMode": "auto",
+      "displayConfig": { "mode": "matchDevice", "width": 1280, "height": 720, "scale": 1.0, "orientationLock": "auto", "targetFps": 240, "bandwidthMode": "custom", "maxBandwidthMbps": 0 },
+      "audioConfig": { "mode": "local" },
+      "inputConfig": { "defaultMode": "directTouch", "swapButtons": false, "textInputMode": "scancode" },
+      "favorite": false,
+      "lastConnectedAt": null
+    }
+  ]
+}
+''';
+      final badRes = ProfileValidator.validateBundleJson(badFpsBw);
+      expect(badRes.isValid, isFalse);
+      expect(badRes.errors.length, 2);
+    });
   });
 }

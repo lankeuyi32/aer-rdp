@@ -153,6 +153,24 @@ class ProfileStore extends ChangeNotifier {
     await _persist();
   }
 
+  Future<void> detachCredentialId(String credentialId) async {
+    bool changed = false;
+    _profiles.updateAll((_, profile) {
+      if (profile.credentialId == credentialId) {
+        changed = true;
+        return profile.copyWith(
+          clearCredentialId: true,
+          authMode: AuthMode.prompt,
+        );
+      }
+      return profile;
+    });
+    if (changed) {
+      notifyListeners();
+      await _persist();
+    }
+  }
+
   String exportBundleJson() {
     return ProfileBundleV1(profiles: profiles).toPrettyJson();
   }

@@ -79,6 +79,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FfiAudioReadResult dco_decode_ffi_audio_read_result(dynamic raw);
 
   @protected
+  FfiBandwidthMode dco_decode_ffi_bandwidth_mode(dynamic raw);
+
+  @protected
   FfiCertInfo dco_decode_ffi_cert_info(dynamic raw);
 
   @protected
@@ -229,6 +232,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FfiAudioReadResult sse_decode_ffi_audio_read_result(
     SseDeserializer deserializer,
   );
+
+  @protected
+  FfiBandwidthMode sse_decode_ffi_bandwidth_mode(SseDeserializer deserializer);
 
   @protected
   FfiCertInfo sse_decode_ffi_cert_info(SseDeserializer deserializer);
@@ -406,6 +412,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_ffi_audio_read_result(
     FfiAudioReadResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_ffi_bandwidth_mode(
+    FfiBandwidthMode self,
     SseSerializer serializer,
   );
 

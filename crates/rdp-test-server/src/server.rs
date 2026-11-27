@@ -3,29 +3,31 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use ironrdp::connector::ServerName;
-use ironrdp::core::{decode, encode_vec};
-use ironrdp::pdu::Action;
-use ironrdp::pdu::input::InputEvent;
-use ironrdp::pdu::input::fast_path::{FastPathInput, FastPathInputEvent, KeyboardFlags};
-use ironrdp::pdu::input::mouse::PointerFlags;
-use ironrdp::pdu::input::mouse_x::PointerXFlags;
-use ironrdp::pdu::mcs::{DisconnectProviderUltimatum, DisconnectReason, McsMessage, SendDataIndication};
-use ironrdp::pdu::nego::SecurityProtocol;
-use ironrdp::pdu::rdp::capability_sets::{
+use ironrdp_connector::ServerName;
+use ironrdp_core::{decode, encode_vec};
+use ironrdp_pdu::Action;
+use ironrdp_pdu::input::InputEvent;
+use ironrdp_pdu::input::fast_path::{FastPathInput, FastPathInputEvent, KeyboardFlags};
+use ironrdp_pdu::input::mouse::PointerFlags;
+use ironrdp_pdu::input::mouse_x::PointerXFlags;
+use ironrdp_pdu::mcs::{
+    DisconnectProviderUltimatum, DisconnectReason, McsMessage, SendDataIndication,
+};
+use ironrdp_pdu::nego::SecurityProtocol;
+use ironrdp_pdu::rdp::capability_sets::{
     Bitmap, BitmapCodecs, BitmapDrawingFlags, CapabilitySet, CmdFlags, General,
     GeneralExtraFlags, Input, InputFlags, MultifragmentUpdate, Order, OrderFlags,
     OrderSupportExFlags, Pointer, Sound, SoundFlags, SurfaceCommands, VirtualChannel,
     VirtualChannelFlags,
 };
-use ironrdp::pdu::rdp::headers::{
+use ironrdp_pdu::rdp::headers::{
     ShareControlHeader, ShareControlPdu, ShareDataHeader, ShareDataPdu, StreamPriority,
 };
-use ironrdp::pdu::rdp::server_error_info::{
+use ironrdp_pdu::rdp::server_error_info::{
     ErrorInfo, ProtocolIndependentCode, ServerSetErrorInfoPdu,
 };
-use ironrdp::pdu::x224::X224;
-use ironrdp::svc::server_encode_svc_messages;
+use ironrdp_pdu::x224::X224;
+use ironrdp_svc::server_encode_svc_messages;
 use ironrdp_acceptor::{Acceptor, AcceptorResult, BeginResult, DesktopSize, accept_begin, accept_finalize};
 use ironrdp_tokio::{FramedWrite as _, TokioFramed};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt as _};
@@ -153,15 +155,29 @@ pub async fn run_rdp_accept_loop(
                 let Ok((tcp_stream, peer_addr)) = accepted else {
                     break;
                 };
-                let _ = tcp_stream.set_nodelay(true);
+                let Ok(std_stream) = tcp_stream.into_std() else {
+                    continue;
+                };
+                let _ = std_stream.set_nonblocking(true);
+                let _ = std_stream.set_nodelay(true);
                 let cfg = config.clone();
                 let id = Arc::clone(&identity);
                 let m = Arc::clone(&metrics);
                 let inp = Arc::clone(&recorded_inputs);
                 let rx = control_tx.subscribe();
-                tokio::spawn(async move {
-                    if let Err(err) = handle_client(tcp_stream, peer_addr, cfg, id, m, inp, rx).await {
-                        debug!(error = %err, "mock RDP client session ended");
+                std::thread::spawn(move || {
+                    if let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        rt.block_on(async move {
+                            if let Ok(stream) = TcpStream::from_std(std_stream)
+                                && let Err(err) =
+                                    handle_client(stream, peer_addr, cfg, id, m, inp, rx).await
+                            {
+                                debug!(error = %err, "mock RDP client session ended");
+                            }
+                        });
                     }
                 });
             }
@@ -200,7 +216,14 @@ async fn handle_client(
 
     let security = security_protocol_for(config.auth_mode);
     let mut acceptor = Acceptor::new(security, desktop_size, build_server_capabilities(desktop_size), None);
-    acceptor.set_honor_client_desktop_size(config.honor_client_desktop_size);
+    acceptor.set_honor_client_desktop_size(
+        config
+            .honor_client_desktop_size
+            .then_some(DesktopSize {
+                width: 8192,
+                height: 8192,
+            }),
+    );
     acceptor.attach_static_channel(TestRdpsndProcessor::new(
         config.rdpsnd_version,
         config.audio_sample_rate,
@@ -886,10 +909,10 @@ where
     let Some(rdpsnd_id) = result.static_channels.get_channel_id_by_type::<TestRdpsndProcessor>() else {
         return Ok(false);
     };
-    let msg_opt = if let Some(svc) = result.static_channels.get_by_channel_id_mut(rdpsnd_id) {
+    let msgs_opt = if let Some(svc) = result.static_channels.get_by_channel_id_mut(rdpsnd_id) {
         if let Some(proc) = svc.channel_processor_downcast_mut::<TestRdpsndProcessor>() {
             if proc.is_ready() {
-                Some(proc.build_tone_wave_msg(audio_hz, chunk_ms))
+                Some(proc.build_tone_wave_msgs(audio_hz, chunk_ms))
             } else {
                 None
             }
@@ -900,8 +923,8 @@ where
         None
     };
 
-    if let Some(msg) = msg_opt {
-        let bytes = server_encode_svc_messages(vec![msg], rdpsnd_id, result.user_channel_id)?;
+    if let Some(msgs) = msgs_opt {
+        let bytes = server_encode_svc_messages(msgs, rdpsnd_id, result.user_channel_id)?;
         framed.write_all(&bytes).await?;
         return Ok(true);
     }
@@ -946,7 +969,7 @@ where
         share_id,
         pdu_source: io_channel_id,
         share_control_pdu: ShareControlPdu::ServerDeactivateAll(
-            ironrdp::pdu::rdp::headers::ServerDeactivateAll,
+            ironrdp_pdu::rdp::headers::ServerDeactivateAll,
         ),
     };
     let user_data = Cow::Owned(encode_vec(&sc)?);
@@ -970,8 +993,8 @@ where
 {
     let sd = ShareDataHeader {
         stream_priority: StreamPriority::Medium,
-        compression_flags: ironrdp::pdu::rdp::headers::CompressionFlags::empty(),
-        compression_type: ironrdp::pdu::rdp::client_info::CompressionType::K8,
+        compression_flags: ironrdp_pdu::rdp::headers::CompressionFlags::empty(),
+        compression_type: ironrdp_pdu::rdp::client_info::CompressionType::K8,
         share_data_pdu: ShareDataPdu::ShutdownDenied,
     };
     let sc = ShareControlHeader {
@@ -1001,8 +1024,8 @@ where
 {
     let sd = ShareDataHeader {
         stream_priority: StreamPriority::Medium,
-        compression_flags: ironrdp::pdu::rdp::headers::CompressionFlags::empty(),
-        compression_type: ironrdp::pdu::rdp::client_info::CompressionType::K8,
+        compression_flags: ironrdp_pdu::rdp::headers::CompressionFlags::empty(),
+        compression_type: ironrdp_pdu::rdp::client_info::CompressionType::K8,
         share_data_pdu: ShareDataPdu::ServerSetErrorInfo(ServerSetErrorInfoPdu(error_info)),
     };
     let sc = ShareControlHeader {

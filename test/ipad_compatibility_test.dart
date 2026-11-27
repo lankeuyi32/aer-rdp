@@ -13,6 +13,7 @@ import 'package:aer_rdp/ui/session/auth_prompt_dialog.dart';
 import 'package:aer_rdp/ui/session/cert_trust_dialog.dart';
 import 'package:aer_rdp/ui/session/session_canvas.dart';
 import 'package:aer_rdp/ui/session/session_page.dart';
+import 'package:aer_rdp/ui/session/special_key_bar.dart';
 import 'package:aer_rdp/ui/session/viewport_controller.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -140,23 +141,23 @@ void main() {
         await tester.pumpAndSettle();
         expectNoFlutterError(tester);
 
-        await tester.ensureVisible(find.text('Custom'));
+        await tester.ensureVisible(find.text('自定义分辨率'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Custom'));
+        await tester.tap(find.text('自定义分辨率'));
         await tester.pumpAndSettle();
         expectNoFlutterError(tester);
-        expect(find.text('Width'), findsOneWidget);
-        expect(find.text('Height'), findsOneWidget);
-        expect(find.text('Scale'), findsOneWidget);
+        expect(find.text('宽度'), findsOneWidget);
+        expect(find.text('高度'), findsOneWidget);
+        expect(find.text('缩放'), findsOneWidget);
 
-        await tester.tap(find.text('Cancel'));
+        await tester.tap(find.text('取消'));
         await tester.pumpAndSettle();
 
         // QuickConnectDialog at narrow width.
         await tester.tap(find.byKey(AerKeys.quickConnectButton));
         await tester.pumpAndSettle();
         expectNoFlutterError(tester);
-        await tester.tap(find.text('Cancel'));
+        await tester.tap(find.text('取消'));
         await tester.pumpAndSettle();
       });
     }
@@ -471,11 +472,14 @@ void main() {
       await tester.pump();
       expect(controller.recordedInputs, isEmpty);
 
-      // Open SpecialKeyBar, toggle Shift sticky, then press modifier-only Cmd -> Shift stays active.
-      await tester.tap(find.byKey(AerKeys.commandBarPill));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(AerKeys.commandBarKeyboard));
-      await tester.pumpAndSettle();
+      // SpecialKeyBar is docked at the bottom row by default (Termius-style);
+      // toggle Shift sticky, then press modifier-only Cmd -> Shift stays active.
+      expect(find.byKey(AerKeys.specialKeyBar), findsOneWidget);
+      final Rect barRect = tester.getRect(find.byKey(AerKeys.specialKeyBar));
+      expect(barRect.bottom, closeTo(768.0, 0.5));
+      expect(barRect.left, closeTo(0.0, 0.5));
+      expect(barRect.right, closeTo(1024.0, 0.5));
+
       await tester.tap(find.text('Shift'));
       await tester.pump();
 
@@ -483,7 +487,9 @@ void main() {
       await tester.tap(find.byKey(AerKeys.sessionCanvas));
       await tester.pump();
       expect(
-        tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Shift')).selected,
+        tester
+            .widget<ShortcutKeycap>(find.widgetWithText(ShortcutKeycap, 'Shift'))
+            .selected,
         isTrue,
       );
 
@@ -496,7 +502,9 @@ void main() {
         isFalse,
       );
       expect(
-        tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Shift')).selected,
+        tester
+            .widget<ShortcutKeycap>(find.widgetWithText(ShortcutKeycap, 'Shift'))
+            .selected,
         isTrue,
       );
 
@@ -512,9 +520,52 @@ void main() {
         isTrue,
       );
       expect(
-        tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Shift')).selected,
+        tester
+            .widget<ShortcutKeycap>(find.widgetWithText(ShortcutKeycap, 'Shift'))
+            .selected,
         isFalse,
       );
+
+      // Verify right-end up/down button expands and collapses the multi-row shortcut tray.
+      expect(find.byKey(AerKeys.specialKeyBarExpandedPanel), findsNothing);
+      await tester.tap(find.byKey(AerKeys.specialKeyBarExpandToggle));
+      await tester.pumpAndSettle();
+      expect(find.byKey(AerKeys.specialKeyBarExpandedPanel), findsOneWidget);
+      expect(find.text('Win+D'), findsOneWidget);
+      expect(find.text('F12'), findsOneWidget);
+
+      controller.recordedInputs.clear();
+      await tester.tap(find.text('Win+D'));
+      await tester.pump();
+      expect(
+        controller.recordedInputs
+            .where((e) => e.kind == 'scancode')
+            .map((e) => (e.code, e.extended, e.down))
+            .toList(),
+        <(int, bool, bool)>[
+          (0x5B, true, true),
+          (0x20, false, true),
+          (0x20, false, false),
+          (0x5B, true, false),
+        ],
+      );
+
+      await tester.tap(find.byKey(AerKeys.specialKeyBarExpandToggle));
+      await tester.pumpAndSettle();
+      expect(find.byKey(AerKeys.specialKeyBarExpandedPanel), findsNothing);
+
+      // Verify right-pinned keyboard button toggles IME and bar lifts above viewInsets.bottom.
+      await tester.tap(find.byKey(AerKeys.specialKeyBarKeyboardToggle));
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      final Rect liftedBarRect =
+          tester.getRect(find.byKey(AerKeys.specialKeyBar));
+      expect(liftedBarRect.bottom, closeTo(768.0 - 260.0, 0.5));
+      await tester.tap(find.byKey(AerKeys.specialKeyBarKeyboardToggle));
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
 
       // Hold 'A' key, then move focus away -> focus loss must release held key (0x1E down=false).
       controller.recordedInputs.clear();
